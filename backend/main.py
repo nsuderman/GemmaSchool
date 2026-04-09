@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import json
+from pathlib import Path
 
 from routers import quests, agents, setup, vault
 
@@ -51,6 +52,25 @@ manager = ConnectionManager()
 # Make manager available to routers
 app.state.ws_manager = manager
 
+MODEL_FILE_TO_ID = {
+    "gemma-4-E2B-it-Q4_K_M.gguf": "gemma4:e2b",
+    "gemma-4-E4B-it-Q4_K_M.gguf": "gemma4:e4b",
+    "gemma-4-26B-A4B-it-UD-Q4_K_M.gguf": "gemma4:26b",
+}
+
+
+def _env_value(key: str, default: str = "") -> str:
+    env_path = Path("/project/.env")
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            k, v = stripped.split("=", 1)
+            if k.strip() == key:
+                return v.strip()
+    return os.getenv(key, default)
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -65,28 +85,47 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/health")
 async def health():
     import requests as _requests
-    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
-    ollama_model = os.getenv("OLLAMA_MODEL", "")
+
+    llama_url = _env_value("LLAMA_BASE_URL", "http://llama-server:8080")
+    configured_model = _env_value("LLAMA_MODEL", "")
+    configured_file = _env_value("LLAMA_MODEL_FILE", "")
+    models_dir = Path("/project/models")
+
+    active_file = configured_file
+    active_model = configured_model
+    active_target = models_dir / configured_file if configured_file else None
+
+    if active_target and active_target.exists():
+        if active_target.is_symlink():
+            resolved = active_target.resolve().name
+            active_file = resolved
+            active_model = MODEL_FILE_TO_ID.get(resolved, configured_model or "unknown")
+        else:
+            active_file = active_target.name
+            active_model = MODEL_FILE_TO_ID.get(active_file, configured_model or "unknown")
+
+    available_files = sorted([p.name for p in models_dir.glob("*.gguf")]) if models_dir.exists() else []
 
     try:
-        resp = _requests.get(f"{ollama_url}/api/tags", timeout=3)
-        models = [m["name"] for m in resp.json().get("models", [])]
-        ollama_ok = True
+        _requests.get(f"{llama_url}/health", timeout=3)
+        llama_ok = True
     except Exception:
-        models = []
-        ollama_ok = False
+        llama_ok = False
 
     return {
         "status": "ok",
-        "ollama": ollama_url,
-        "ollama_reachable": ollama_ok,
+        "llama": llama_url,
+        "llama_reachable": llama_ok,
         "vault_path": os.getenv("VAULT_PATH", "/vault"),
         "models": {
-            "configured": ollama_model,
-            "available": models,
+            "configured": configured_model,
+            "configured_file": configured_file,
+            "active": active_model,
+            "active_file": active_file,
+            "available_files": available_files,
             "hint": (
-                None if models
-                else "Use the setup wizard to pull a Gemma model via Ollama."
+                None if active_file
+                else "Use the setup wizard to download and configure a GGUF model."
             ),
         },
     }

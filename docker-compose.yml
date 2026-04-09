@@ -1,15 +1,28 @@
 services:
 
-  # ── Ollama — model runtime (replaces llama-server) ───────────
-  # Starts with the base stack. Setup wizard pulls models on first run.
-  # Ollama is built on llama.cpp internally.
-  ollama:
-    image: ollama/ollama
-    container_name: gemmaschool-ollama
+  # ── llama.cpp server — local model runtime ───────────────────
+  llama-server:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: gemmaschool-llama
     volumes:
-      - ollama_data:/root/.ollama
+      - ./models:/models
     ports:
-      - "11434:11434"
+      - "8080:8080"
+    command:
+      - --models-dir
+      - /models
+      - --models-max
+      - "1"
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - -np
+      - "1"
+      - -c
+      - "8192"
+      - -ngl
+      - "0"
     restart: unless-stopped
 
   # ── Backend ───────────────────────────────────────────────────
@@ -22,13 +35,15 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - LLAMA_BASE_URL=http://llama-server:8080
+      - LLAMA_MODEL=${LLAMA_MODEL:-gemma4:e2b}
+      - LLAMA_MODEL_FILE=${LLAMA_MODEL_FILE:-gemma-4-E2B-it-Q4_K_M.gguf}
       - VAULT_PATH=/vault
       - FASTSD_URL=http://fastsd:7860
       - HOST_RAM_GB=${HOST_RAM_GB:-}
       - HOST_CPU_CORES=${HOST_CPU_CORES:-}
     depends_on:
-      - ollama
+      - llama-server
     restart: unless-stopped
 
   # ── Frontend ──────────────────────────────────────────────────
@@ -55,5 +70,4 @@ services:
       - "7860:7860"
     restart: unless-stopped
 
-volumes:
-  ollama_data:   # persists pulled models across container restarts
+volumes: {}

@@ -1,5 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useWebSocket } from '../hooks/useWebSocket'
+
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const AGENTS = [
   { name: 'Architect', icon: 'architecture',  color: 'text-primary',   desc: 'Curriculum Planner' },
@@ -23,6 +25,33 @@ export default function Dashboard() {
   const [mentorNote, setMentorNote] = useState(
     'Your vault has 0 Daily Quests. Run The Architect to begin your 180-day learning journey.'
   )
+  const [modelState, setModelState] = useState(null)
+  const [selectedModelId, setSelectedModelId] = useState('')
+  const [modelBusy, setModelBusy] = useState(false)
+  const [modelError, setModelError] = useState('')
+  const [modelMessage, setModelMessage] = useState('')
+  const [downloadPct, setDownloadPct] = useState(null)
+
+  const loadModels = useCallback(async () => {
+    const res = await fetch(`${API}/setup/models`)
+    if (!res.ok) throw new Error('Failed to load model list')
+    const data = await res.json()
+    setModelState(data)
+
+    const all = [...(data.models || []), ...(data.extra_models || [])]
+    const active = all.find((m) => m.active)
+    setSelectedModelId((prev) => {
+      if (active) return active.id
+      if (prev && all.some((m) => m.id === prev)) return prev
+      return all[0]?.id || ''
+    })
+  }, [])
+
+  useEffect(() => {
+    loadModels().catch(() => {
+      setModelError('Could not load model manager right now.')
+    })
+  }, [loadModels])
 
   const onMessage = useCallback((payload) => {
     setEvents((prev) => [payload, ...prev].slice(0, 10))
@@ -36,6 +65,92 @@ export default function Dashboard() {
   }, [])
 
   useWebSocket(onMessage)
+
+  const allModels = [...(modelState?.models || []), ...(modelState?.extra_models || [])]
+  const selectedModel = allModels.find((m) => m.id === selectedModelId)
+
+  const downloadSelectedModel = async () => {
+    if (!selectedModel || !selectedModel.url || modelBusy) return
+
+    setModelBusy(true)
+    setModelError('')
+    setModelMessage('Starting download...')
+    setDownloadPct(0)
+
+    try {
+      const res = await fetch(`${API}/setup/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_name: selectedModel.id }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.detail || 'Failed to start download')
+      }
+
+      const { session_id } = await res.json()
+      const es = new EventSource(`${API}/setup/progress/${session_id}`)
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          setDownloadPct(data?.file?.pct ?? null)
+
+          if (data.status === 'complete') {
+            es.close()
+            setModelBusy(false)
+            setModelMessage('Download complete. Model target updated.')
+            setDownloadPct(null)
+            loadModels().catch(() => {})
+          } else if (data.status === 'error') {
+            es.close()
+            setModelBusy(false)
+            setModelError(data.error || 'Download failed')
+            setDownloadPct(null)
+          }
+        } catch {
+          // ignore malformed events
+        }
+      }
+
+      es.onerror = () => {
+        es.close()
+        setModelBusy(false)
+        setModelError('Download stream interrupted')
+      }
+    } catch (err) {
+      setModelBusy(false)
+      setDownloadPct(null)
+      setModelError(String(err))
+    }
+  }
+
+  const activateSelectedModel = async () => {
+    if (!selectedModel || !selectedModel.downloaded || modelBusy) return
+
+    setModelBusy(true)
+    setModelError('')
+    setModelMessage('Activating selected model...')
+
+    try {
+      const modelName = selectedModel.url ? selectedModel.id : selectedModel.file
+      const res = await fetch(`${API}/setup/activate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model_name: modelName }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Failed to activate model')
+
+      setModelMessage(data.message || 'Model activated.')
+      await loadModels()
+    } catch (err) {
+      setModelError(String(err))
+    } finally {
+      setModelBusy(false)
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -175,7 +290,68 @@ export default function Dashboard() {
               </span>
             </div>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Pull a Gemma model via Ollama in the setup wizard, then run the Architect to auto-generate your first semester plan.
+              Download a Gemma GGUF in the setup wizard, then run the Architect to auto-generate your first semester plan.
+            </p>
+          </div>
+
+          <div className="mt-4 p-4 bg-surface-container-low rounded-lg space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
+                Model Runtime
+              </p>
+              {selectedModel?.active && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container">
+                  Active
+                </span>
+              )}
+            </div>
+
+            <select
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              className="w-full bg-surface-container rounded-lg px-3 py-2 text-xs text-on-surface border-none focus:outline-none focus:ring-1 focus:ring-primary/30"
+              disabled={modelBusy || allModels.length === 0}
+            >
+              {allModels.length === 0 ? (
+                <option value="">No models found</option>
+              ) : (
+                allModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} {m.downloaded ? '(downloaded)' : '(not downloaded)'}
+                  </option>
+                ))
+              )}
+            </select>
+
+            {downloadPct != null && (
+              <p className="text-[11px] text-primary font-semibold">Downloading... {downloadPct}%</p>
+            )}
+            {modelError && (
+              <p className="text-[11px] text-error">{modelError}</p>
+            )}
+            {modelMessage && !modelError && (
+              <p className="text-[11px] text-on-surface-variant">{modelMessage}</p>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={downloadSelectedModel}
+                disabled={modelBusy || !selectedModel || selectedModel.downloaded || !selectedModel.url}
+                className="px-3 py-2 bg-primary text-on-primary text-xs font-bold rounded-lg disabled:opacity-40"
+              >
+                Download
+              </button>
+              <button
+                onClick={activateSelectedModel}
+                disabled={modelBusy || !selectedModel || !selectedModel.downloaded || selectedModel.active}
+                className="px-3 py-2 ghost-border text-xs font-bold rounded-lg text-on-surface disabled:opacity-40"
+              >
+                Activate
+              </button>
+            </div>
+
+            <p className="text-[10px] text-on-surface-variant leading-relaxed">
+              After switching models, restart GemmaSchool to ensure llama.cpp loads the new weights.
             </p>
           </div>
         </section>
@@ -263,7 +439,7 @@ export default function Dashboard() {
               </div>
             </div>
             <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-              All four agents are initialized and awaiting tasks. Pull a Gemma model via Ollama
+              All four agents are initialized and awaiting tasks. Download a Gemma GGUF for llama.cpp
               to activate the full agent fleet.
             </p>
             <div className="flex gap-2">

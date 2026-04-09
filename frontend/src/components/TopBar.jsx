@@ -15,10 +15,10 @@ export default function TopBar() {
 
       {/* Actions */}
       <div className="flex items-center gap-4">
-        {/* Ollama status indicator */}
+        {/* llama.cpp status indicator */}
         <div className="flex items-center gap-2 text-xs text-on-surface-variant bg-surface-container rounded-full px-3 py-1.5">
           <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-          Ollama
+          llama.cpp
         </div>
 
         <button className="p-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-full transition-colors relative">

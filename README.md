@@ -4,12 +4,12 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11-blue)](backend/requirements.txt)
 [![React](https://img.shields.io/badge/React-18-61dafb)](frontend/package.json)
-[![Ollama](https://img.shields.io/badge/Ollama-latest-green)](https://ollama.com)
-[![Gemma](https://img.shields.io/badge/Model-Gemma_3-orange)](https://ai.google.dev/gemma)
+[![llama.cpp](https://img.shields.io/badge/llama.cpp-latest-green)](https://github.com/ggml-org/llama.cpp)
+[![Gemma](https://img.shields.io/badge/Model-Gemma_4-orange)](https://ai.google.dev/gemma)
 
 ![GemmaSchool Header](assets/header.png)
 
-> **GemmaSchool** is an AI-augmented, self-sovereign homeschooling ecosystem. It transforms static curriculum into an interactive "Quest" system, running entirely on local hardware via **Gemma 4** and **Ollama** — no accounts, no tokens, no cloud.
+> **GemmaSchool** is an AI-augmented, self-sovereign homeschooling ecosystem. It transforms static curriculum into an interactive "Quest" system, running entirely on local hardware via **Gemma 4** and **llama.cpp** — no accounts, no tokens, no cloud.
 
 ---
 
@@ -19,7 +19,7 @@ GemmaSchool returns educational power to the family. By leveraging the **Gemma**
 ## 🏆 Competition Tracks
 GemmaSchool is engineered for excellence in two primary **Gemma 4 Good** tracks:
 * **Future of Education:** Transforming multi-step curriculum PDFs into adaptive, personalized "Daily Quests."
-* **Technical Excellence:** Demonstrating frontier multimodal performance (Vision + Text) on home hardware using Ollama.
+* **Technical Excellence:** Demonstrating frontier multimodal performance (Vision + Text) on home hardware using llama.cpp.
 
 ---
 
@@ -50,8 +50,8 @@ Your child's progress lives as plain Markdown in the `vault/` directory. GemmaSc
 
 | Layer | Technology |
 |---|---|
-| Inference | Ollama (`ollama/ollama` Docker image, OpenAI-compatible API) |
-| Vision | Gemma Vision via Ollama |
+| Inference | llama.cpp server (`ghcr.io/ggml-org/llama.cpp:server`) |
+| Vision | Gemma Vision via llama.cpp |
 | Imaging | FastSD CPU (OpenVINO) — local 16:9 hero images |
 | Backend | FastAPI + WebSockets + SSE |
 | Frontend | React 18 (Vite) + Tailwind CSS (Stitch UI) |
@@ -81,7 +81,7 @@ docker compose up --build
 
 Open **http://localhost:5173** — the setup wizard guides you through:
 - Selecting a Gemma model size for your hardware
-- Pulling the model via Ollama (progress bar included)
+- Downloading a public GGUF model (progress bar included)
 - Writing your `.env` automatically
 
 ### Full Stack (with FastSD image generation)
@@ -114,7 +114,7 @@ This project integrates the following third-party components. Each retains its o
 
 | Component | License | Notes |
 |---|---|---|
-| [Ollama](https://github.com/ollama/ollama) | MIT | LLM serving engine |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) | MIT | LLM serving engine |
 | [FastSD CPU](https://github.com/rupeshs/fastsdcpu) | Apache 2.0 | Local image generation |
 | [FastAPI](https://github.com/tiangolo/fastapi) | MIT | Backend framework |
 | [React](https://github.com/facebook/react) | MIT | Frontend framework |
@@ -127,7 +127,7 @@ This project integrates the following third-party components. Each retains its o
 
 **Gemma models are NOT covered by this Apache 2.0 license.**
 
-The Gemma models pulled via Ollama are subject to Google's
+The Gemma models downloaded by the setup wizard are subject to Google's
 [Gemma Terms of Use](https://ai.google.dev/gemma/terms). By using GemmaSchool you agree to
 use the models only as permitted under those terms and not to redistribute model weights.
 

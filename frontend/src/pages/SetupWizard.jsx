@@ -5,31 +5,34 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 // ── Model presets ─────────────────────────────────────────────
 const MODELS = [
   {
-    id: 'gemma4:4b',
+    id: 'gemma4:e4b',
     name: 'Gemma 4 E4B',
-    size: '3.3 GB',
-    ram: '6 GB RAM',
+    size: '5.0 GB',
+    minFreeGb: 5,
+    ram: '5 GB free RAM',
     badge: 'Recommended',
     badgeColor: 'bg-secondary-container text-on-secondary-container',
     desc: 'The default competition model. Best balance of speed, vision, and quality on CPU-only hardware.',
   },
   {
-    id: 'gemma4:2b',
+    id: 'gemma4:e2b',
     name: 'Gemma 4 E2B',
-    size: '1.6 GB',
-    ram: '4 GB RAM',
+    size: '3.2 GB',
+    minFreeGb: 3,
+    ram: '3 GB free RAM',
     badge: 'Lightweight',
     badgeColor: 'bg-tertiary-container text-on-tertiary-container',
-    desc: 'Great for low-memory devices. Faster inference, slightly reduced reasoning.',
+    desc: 'Faster inference with a smaller footprint. Good for 8 GB machines.',
   },
   {
-    id: 'gemma4:12b',
-    name: 'Gemma 4 12B',
-    size: '8.1 GB',
-    ram: '16 GB RAM',
+    id: 'gemma4:26b',
+    name: 'Gemma 4 26B',
+    size: '16.9 GB',
+    minFreeGb: 18,
+    ram: '18 GB free RAM',
     badge: 'Advanced',
     badgeColor: 'bg-primary-container text-on-primary-container',
-    desc: 'Significantly stronger reasoning. Requires a high-memory machine.',
+    desc: 'Maximum quality. Requires a high-memory machine.',
   },
 ]
 
@@ -220,8 +223,8 @@ export default function SetupWizard({ onComplete }) {
                   Welcome to your sovereign school.
                 </h2>
                 <p className="text-on-surface-variant leading-relaxed">
-                  No models were found. This wizard will pull the AI model needed to power
-                  your Quest system via <strong className="text-on-surface">Ollama</strong> —
+                  No models were found. This wizard will download the GGUF model needed to power
+                  your Quest system via <strong className="text-on-surface">llama.cpp</strong> —
                   everything runs locally on your hardware, with no accounts required.
                 </p>
               </div>
@@ -229,7 +232,7 @@ export default function SetupWizard({ onComplete }) {
               <div className="grid grid-cols-3 gap-4">
                 {[
                   { icon: 'lock',        title: '100% Local',   desc: 'No data leaves your machine' },
-                  { icon: 'bolt',        title: 'Ollama',       desc: 'One-command model serving' },
+                  { icon: 'bolt',        title: 'llama.cpp',    desc: 'Local GGUF serving engine' },
                   { icon: 'folder_open', title: 'Knowledge Grove', desc: 'Built-in graph view' },
                 ].map((f) => (
                   <div key={f.title} className="bg-surface-container-low rounded-xl p-4 text-center">
@@ -247,9 +250,9 @@ export default function SetupWizard({ onComplete }) {
                   info
                 </span>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  No Hugging Face account or API token needed. Ollama pulls the model
-                  directly from the Ollama registry. Setup takes 5–15 minutes depending
-                  on your connection speed.
+                  No Hugging Face account or API token needed. GemmaSchool downloads
+                  a public GGUF build and configures llama.cpp automatically.
+                  Setup takes 5–15 minutes depending on your connection speed.
                 </p>
               </div>
 
@@ -307,8 +310,8 @@ export default function SetupWizard({ onComplete }) {
                         if (gb) {
                           const avail = sysinfo.available_gb
                           const recommended =
-                            avail >= 14 ? 'gemma4:12b' :
-                            avail >= 5  ? 'gemma4:4b'  : 'gemma4:2b'
+                            avail >= 20 ? 'gemma4:26b' :
+                            avail >= 5  ? 'gemma4:e4b' : 'gemma4:e2b'
                           setSysinfo((s) => ({ ...s, ram_gb: gb, recommended }))
                           const rec = MODELS.find((m) => m.id === recommended)
                           if (rec) setSelected(rec)
@@ -334,7 +337,7 @@ export default function SetupWizard({ onComplete }) {
               {/* Model cards */}
               <div className="space-y-3">
                 {MODELS.map((m) => {
-                  const ramRequired = parseFloat(m.ram)
+                  const ramRequired = m.minFreeGb ?? parseFloat(m.ram)
                   const effectiveRam = sysinfo?.available_gb  // use free RAM, not total
                   const fits = effectiveRam ? effectiveRam >= ramRequired : true
                   const isRec = sysinfo?.recommended === m.id
@@ -397,7 +400,7 @@ export default function SetupWizard({ onComplete }) {
                   className="flex-1 py-3 ai-shimmer text-on-primary rounded-xl font-bold text-sm hover:scale-[1.01] active:scale-99 transition-transform shadow-primary-glow flex items-center justify-center gap-2"
                 >
                   <span className="material-symbols-outlined text-[18px]">download</span>
-                  Pull {selectedModel.name}
+                  Download {selectedModel.name}
                 </button>
               </div>
             </div>
@@ -408,10 +411,10 @@ export default function SetupWizard({ onComplete }) {
             <div className="space-y-8">
               <div>
                 <h2 className="text-3xl font-headline font-extrabold tracking-tight text-on-surface mb-3">
-                  Pulling model
+                  Downloading model
                 </h2>
                 <p className="text-on-surface-variant leading-relaxed">
-                  Ollama is downloading <strong className="text-on-surface">{selectedModel.name}</strong> ({selectedModel.size}).
+                  GemmaSchool is downloading <strong className="text-on-surface">{selectedModel.name}</strong> ({selectedModel.size}).
                   This may take several minutes depending on your connection.
                 </p>
               </div>
@@ -453,7 +456,7 @@ export default function SetupWizard({ onComplete }) {
                   <>
                     <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
                     <p className="text-sm text-on-surface-variant">
-                      {dlState?.status === 'starting' ? 'Connecting to Ollama…' : 'Downloading layers…'}
+                      {dlState?.status === 'starting' ? 'Preparing download…' : 'Downloading model…'}
                     </p>
                   </>
                 )}
@@ -495,10 +498,10 @@ export default function SetupWizard({ onComplete }) {
                   Model active
                 </p>
                 <code className="block font-mono text-sm text-primary bg-surface-container rounded-lg px-4 py-3">
-                  ollama run {selectedModel.id}
+                  llama-server -m models/{dlState?.file?.filename || 'your-model.gguf'}
                 </code>
                 <p className="text-xs text-on-surface-variant">
-                  Ollama is running inside Docker and managed automatically by GemmaSchool.
+                  llama.cpp is running inside Docker and managed automatically by GemmaSchool.
                 </p>
               </div>
 
