@@ -109,7 +109,8 @@ export default function SetupWizard({ onComplete }) {
   const [selectedModel, setSelected] = useState(MODELS[0])
 
   // System info
-  const [sysinfo, setSysinfo] = useState(null)
+  const [sysinfo, setSysinfo]       = useState(null)
+  const [ramOverride, setRamOverride] = useState(null)   // user can correct detection
 
   // Download state
   const [sessionId, setSessionId]   = useState(null)
@@ -117,17 +118,44 @@ export default function SetupWizard({ onComplete }) {
   const [startError, setStartError] = useState(null)
   const sseRef = useRef(null)
 
-  // ── Fetch system info when entering model-select step ────────
+  // ── Detect RAM cross-platform ─────────────────────────────────
+  // navigator.deviceMemory runs in the real browser on the host OS (not
+  // inside Docker), so it's accurate on Windows and macOS. It caps at 8 GB,
+  // so we also ask the backend (psutil) and take the higher value.
   useEffect(() => {
     if (step !== 1 || sysinfo) return
+
+    const browserRam = navigator.deviceMemory ?? null  // undefined in Firefox/Safari → null
+
     fetch(`${API}/setup/sysinfo`)
       .then((r) => r.json())
       .then((data) => {
-        setSysinfo(data)
-        const rec = MODELS.find((m) => m.id === data.recommended)
+        // Use the higher of browser-detected vs Docker-visible RAM.
+        // Docker on Windows/Mac can under-report; browser is always the host.
+        const effectiveRam = browserRam
+          ? Math.max(browserRam, data.ram_gb)
+          : data.ram_gb
+
+        const recommended =
+          effectiveRam >= 16 ? 'gemma4:12b' :
+          effectiveRam >= 6  ? 'gemma4:4b'  : 'gemma4:2b'
+
+        const merged = { ...data, ram_gb: Math.round(effectiveRam * 10) / 10, recommended }
+        setSysinfo(merged)
+        const rec = MODELS.find((m) => m.id === recommended)
         if (rec) setSelected(rec)
       })
-      .catch(() => {/* backend not up yet — silently ignore */})
+      .catch(() => {
+        // Backend not up yet — use browser RAM only if available
+        if (browserRam) {
+          const recommended =
+            browserRam >= 16 ? 'gemma4:12b' :
+            browserRam >= 6  ? 'gemma4:4b'  : 'gemma4:2b'
+          setSysinfo({ ram_gb: browserRam, cpu_cores: null, recommended })
+          const rec = MODELS.find((m) => m.id === recommended)
+          if (rec) setSelected(rec)
+        }
+      })
   }, [step])
 
   // ── SSE listener ─────────────────────────────────────────────
@@ -274,18 +302,46 @@ export default function SetupWizard({ onComplete }) {
 
               {/* Hardware info card */}
               {sysinfo ? (
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { icon: 'memory',     label: 'System RAM',  value: `${sysinfo.ram_gb} GB` },
-                    { icon: 'developer_board', label: 'CPU Cores', value: sysinfo.cpu_cores },
-                    { icon: 'recommend',  label: 'Best Fit',    value: MODELS.find(m => m.id === sysinfo.recommended)?.name ?? sysinfo.recommended },
-                  ].map((s) => (
-                    <div key={s.label} className="bg-surface-container-low rounded-xl p-4 text-center">
-                      <span className="material-symbols-outlined text-primary text-xl block mb-1">{s.icon}</span>
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{s.label}</p>
-                      <p className="text-sm font-bold text-on-surface mt-0.5">{s.value}</p>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { icon: 'memory',          label: 'System RAM',  value: `${ramOverride ?? sysinfo.ram_gb} GB` },
+                      { icon: 'developer_board', label: 'CPU Cores',   value: sysinfo.cpu_cores ?? '—' },
+                      { icon: 'recommend',       label: 'Best Fit',    value: MODELS.find(m => m.id === sysinfo.recommended)?.name ?? sysinfo.recommended },
+                    ].map((s) => (
+                      <div key={s.label} className="bg-surface-container-low rounded-xl p-4 text-center">
+                        <span className="material-symbols-outlined text-primary text-xl block mb-1">{s.icon}</span>
+                        <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{s.label}</p>
+                        <p className="text-sm font-bold text-on-surface mt-0.5">{s.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Manual RAM override — shown if Docker may have under-reported */}
+                  <div className="flex items-center gap-2 text-[11px] text-on-surface-variant">
+                    <span className="material-symbols-outlined text-[14px] text-outline">info</span>
+                    RAM looks wrong?
+                    <select
+                      value={ramOverride ?? ''}
+                      onChange={(e) => {
+                        const gb = Number(e.target.value) || null
+                        setRamOverride(gb)
+                        if (gb) {
+                          const recommended =
+                            gb >= 16 ? 'gemma4:12b' :
+                            gb >= 6  ? 'gemma4:4b'  : 'gemma4:2b'
+                          setSysinfo((s) => ({ ...s, ram_gb: gb, recommended }))
+                          const rec = MODELS.find((m) => m.id === recommended)
+                          if (rec) setSelected(rec)
+                        }
+                      }}
+                      className="bg-surface-container rounded-lg px-2 py-1 text-[11px] text-on-surface border-none focus:outline-none focus:ring-1 focus:ring-primary/20"
+                    >
+                      <option value="">Select actual RAM</option>
+                      {[4, 8, 16, 32, 64].map((gb) => (
+                        <option key={gb} value={gb}>{gb} GB</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-3">
@@ -299,7 +355,8 @@ export default function SetupWizard({ onComplete }) {
               <div className="space-y-3">
                 {MODELS.map((m) => {
                   const ramRequired = parseFloat(m.ram)
-                  const fits = sysinfo ? sysinfo.ram_gb >= ramRequired : true
+                  const effectiveRam = ramOverride ?? sysinfo?.ram_gb
+                  const fits = effectiveRam ? effectiveRam >= ramRequired : true
                   const isRec = sysinfo?.recommended === m.id
                   return (
                   <button
