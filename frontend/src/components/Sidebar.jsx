@@ -1,14 +1,26 @@
 import { NavLink } from 'react-router-dom'
+import { useProfile, PROFILE_COLORS, getInitials } from '../contexts/ProfileContext'
 
-const navItems = [
-  { to: '/',        icon: 'home_app_logo',  label: 'Command Center' },
-  { to: '/quests',  icon: 'map',            label: 'Quest Board' },
-  { to: '/vault',   icon: 'folder_open',    label: 'Vault' },
-  { to: '/agents',  icon: 'psychology',     label: 'Agent Fleet' },
-  { to: '/settings',icon: 'settings',       label: 'Settings' },
+const PARENT_NAV = [
+  { to: '/',         icon: 'home_app_logo', label: 'Command Center' },
+  { to: '/quests',   icon: 'map',           label: 'Quest Board' },
+  { to: '/vault',    icon: 'folder_open',   label: 'Vault' },
+  { to: '/agents',   icon: 'psychology',    label: 'Agent Fleet' },
+  { to: '/settings', icon: 'settings',      label: 'Model Manager' },
+]
+
+const STUDENT_NAV = [
+  { to: '/',       icon: 'home_app_logo', label: 'Command Center' },
+  { to: '/quests', icon: 'map',           label: 'Quest Board' },
+  { to: '/vault',  icon: 'folder_open',   label: 'Vault' },
 ]
 
 export default function Sidebar() {
+  const { activeProfile, logout } = useProfile()
+  const isParent  = activeProfile?.role === 'parent'
+  const navItems  = isParent ? PARENT_NAV : STUDENT_NAV
+  const colors    = PROFILE_COLORS[activeProfile?.color] || PROFILE_COLORS.primary
+
   return (
     <aside className="fixed inset-y-0 left-0 flex flex-col h-full w-64 bg-surface-container-low z-50">
       {/* Wordmark */}
@@ -42,21 +54,29 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Bottom: AI shimmer CTA + profile */}
+      {/* Bottom: New Quest + profile */}
       <div className="p-4 space-y-3">
         <button className="w-full py-3.5 px-4 ai-shimmer text-on-primary rounded-xl font-bold font-headline text-sm flex items-center justify-center gap-2 shadow-primary-glow hover:scale-[1.02] active:scale-95 transition-transform">
           <span className="material-symbols-outlined text-[18px]">add_circle</span>
           New Quest
         </button>
 
+        {/* Active profile chip + switch */}
         <div className="flex items-center gap-3 p-3 bg-surface-container rounded-xl">
-          <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-bold text-sm font-headline flex-shrink-0">
-            P
+          <div className={`w-9 h-9 rounded-full ${colors.bg} ${colors.text} flex items-center justify-center font-bold text-sm font-headline flex-shrink-0`}>
+            {activeProfile ? getInitials(activeProfile.name) : '?'}
           </div>
-          <div className="overflow-hidden">
-            <p className="text-xs font-bold truncate text-on-surface">Parent Admin</p>
-            <p className="text-[10px] text-on-surface-variant">GemmaSchool Home</p>
+          <div className="flex-1 overflow-hidden">
+            <p className="text-xs font-bold truncate text-on-surface">{activeProfile?.name}</p>
+            <p className="text-[10px] text-on-surface-variant capitalize">{activeProfile?.role}</p>
           </div>
+          <button
+            onClick={logout}
+            title="Switch profile"
+            className="text-on-surface-variant hover:text-on-surface transition-colors flex-shrink-0"
+          >
+            <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+          </button>
         </div>
       </div>
     </aside>

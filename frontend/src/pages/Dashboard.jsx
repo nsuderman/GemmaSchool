@@ -239,16 +239,8 @@ export default function Dashboard() {
               <span className="material-symbols-outlined text-primary text-[20px]">sensors</span>
               <h3 className="font-headline font-bold text-lg text-on-surface">Live Activity</h3>
             </div>
-            {events.length > 0 && (
-              <button
-                onClick={() => setEvents([])}
-                className="text-xs text-on-surface-variant hover:text-on-surface font-bold"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-          <ActivityFeed events={events} maxHeight="max-h-[26rem]" />
+            </div>
+          <ActivityFeed events={allEvents} maxHeight="max-h-[26rem]" />
         </section>
       </div>
 
@@ -256,7 +248,7 @@ export default function Dashboard() {
       <section className="mt-16">
         <h3 className="font-headline font-bold text-2xl text-on-surface mb-8">Vault Summaries</h3>
         <div className="flex flex-wrap gap-8 items-start">
-          <div className="w-full md:w-[45%] glass-panel ghost-border p-8 rounded-xl editorial-shadow">
+          <div className="w-full glass-panel ghost-border p-8 rounded-xl editorial-shadow">
             <div className="flex items-start justify-between mb-6">
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary text-3xl">summarize</span>
@@ -279,33 +271,6 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          <div className="w-full md:w-[48%] bg-surface-container-high/50 p-8 rounded-xl mt-12">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="material-symbols-outlined text-secondary text-3xl">psychology</span>
-              <div>
-                <p className="text-[10px] font-bold text-outline-variant uppercase">System Ready</p>
-                <h4 className="font-headline font-bold text-on-surface">Fleet Online</h4>
-              </div>
-            </div>
-            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-              All four agents are initialized and awaiting tasks. Download a Gemma GGUF for llama.cpp
-              to activate the full agent fleet.
-            </p>
-            <div className="flex gap-2">
-              <Link
-                to="/agents"
-                className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
-              >
-                Agent Fleet
-              </Link>
-              <Link
-                to="/settings"
-                className="px-4 py-2 ghost-border text-xs font-bold rounded-lg hover:bg-surface-container transition-colors text-on-surface"
-              >
-                Download Model
-              </Link>
-            </div>
-          </div>
         </div>
       </section>
     </div>

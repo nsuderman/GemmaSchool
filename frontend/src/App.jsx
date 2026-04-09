@@ -8,11 +8,14 @@ import KnowledgeGrove from './pages/KnowledgeGrove'
 import SetupWizard from './pages/SetupWizard'
 import Settings from './pages/Settings'
 import AgentFleet from './pages/AgentFleet'
+import ProfilePicker from './pages/ProfilePicker'
+import { useProfile } from './contexts/ProfileContext'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default function App() {
   const [setupState, setSetupState] = useState('loading') // 'loading' | 'needed' | 'done'
+  const { activeProfile, loading: profileLoading } = useProfile()
 
   useEffect(() => {
     fetch(`${API}/setup/status`)
@@ -22,7 +25,7 @@ export default function App() {
   }, [])
 
   // Loading splash
-  if (setupState === 'loading') {
+  if (setupState === 'loading' || profileLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -37,6 +40,11 @@ export default function App() {
   // First-run setup wizard
   if (setupState === 'needed') {
     return <SetupWizard onComplete={() => setSetupState('done')} />
+  }
+
+  // Profile picker — shown until a profile is selected
+  if (!activeProfile) {
+    return <ProfilePicker />
   }
 
   // Main app

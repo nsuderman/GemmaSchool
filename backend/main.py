@@ -6,7 +6,7 @@ import os
 import json
 from pathlib import Path
 
-from routers import quests, agents, setup, vault
+from routers import quests, agents, setup, vault, profiles
 
 load_dotenv()
 
@@ -20,10 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(setup.router,  prefix="/setup",  tags=["setup"])
-app.include_router(quests.router, prefix="/quests", tags=["quests"])
-app.include_router(agents.router, prefix="/agents", tags=["agents"])
-app.include_router(vault.router,  prefix="/vault",  tags=["vault"])
+app.include_router(setup.router,    prefix="/setup",    tags=["setup"])
+app.include_router(quests.router,   prefix="/quests",   tags=["quests"])
+app.include_router(agents.router,   prefix="/agents",   tags=["agents"])
+app.include_router(vault.router,    prefix="/vault",    tags=["vault"])
+app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
 
 
 # --- WebSocket Connection Manager ---

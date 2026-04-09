@@ -1,0 +1,18 @@
+{
+  "profiles": [
+    {
+      "id": "4e7ea043-7c8c-4cbf-a77a-0a01a9fcac30",
+      "name": "Nate",
+      "role": "parent",
+      "color": "primary",
+      "pin_hash": "948c710e16a15027a561598d053fdf1e910b9d222cab0ac0d09f23a01cc8416b"
+    },
+    {
+      "id": "3fdbac09-2b3c-49ee-9b11-0039135af899",
+      "name": "Coen",
+      "role": "student",
+      "color": "secondary",
+      "pin_hash": "2a1c68bab4a7c58f210f0ce36a3371aa4f90e9a36ca7a8c5f85bc0e8db098e42"
+    }
+  ]
+}
