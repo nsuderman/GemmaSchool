@@ -73,3 +73,4 @@ echo "  To stop: quit OrbStack from the menu bar, or run 'make stop'."
 echo ""
 echo "  Closing this window in 3 seconds..."
 sleep 3
+osascript -e 'tell application "Terminal" to close front window' &
