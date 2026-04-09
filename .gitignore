@@ -1,0 +1,26 @@
+# Models (large binary files)
+models/*.gguf
+models/*.bin
+
+# Environment
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Vault generated content (keep structure, ignore generated files)
+vault/Daily_Quests/*.md
+vault/Assets/*.png
+vault/Assets/*.jpg
+vault/Assets/*.webp
+
+# OS
+.DS_Store

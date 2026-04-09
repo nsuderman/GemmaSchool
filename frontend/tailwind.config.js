@@ -1,0 +1,87 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        // ─── Stitch "Intelligent Canvas" token palette ───
+        'primary':                   '#005cc0',
+        'primary-dim':               '#0050a9',
+        'primary-fixed':             '#a3c1ff',
+        'primary-fixed-dim':         '#8db3ff',
+        'primary-container':         '#a3c1ff',
+        'on-primary':                '#f9f8ff',
+        'on-primary-fixed':          '#002657',
+        'on-primary-fixed-variant':  '#00438f',
+        'on-primary-container':      '#003a7f',
+        'inverse-primary':           '#498eff',
+
+        'secondary':                 '#1c6d25',
+        'secondary-dim':             '#096119',
+        'secondary-fixed':           '#a3f69c',
+        'secondary-fixed-dim':       '#95e88f',
+        'secondary-container':       '#a3f69c',
+        'on-secondary':              '#eaffe2',
+        'on-secondary-fixed':        '#004b0f',
+        'on-secondary-fixed-variant':'#176a21',
+        'on-secondary-container':    '#065f18',
+
+        'tertiary':                  '#835600',
+        'tertiary-dim':              '#734b00',
+        'tertiary-fixed':            '#feaa00',
+        'tertiary-fixed-dim':        '#ec9e00',
+        'tertiary-container':        '#feaa00',
+        'on-tertiary':               '#fff8f2',
+        'on-tertiary-fixed':         '#331f00',
+        'on-tertiary-fixed-variant': '#5b3b00',
+        'on-tertiary-container':     '#503300',
+
+        'surface':                   '#f8f9fa',
+        'surface-bright':            '#f8f9fa',
+        'surface-dim':               '#d5dbdd',
+        'surface-variant':           '#dee3e5',
+        'surface-tint':              '#005cc0',
+        'surface-container-lowest':  '#ffffff',
+        'surface-container-low':     '#f2f4f5',
+        'surface-container':         '#ebeef0',
+        'surface-container-high':    '#e5e9eb',
+        'surface-container-highest': '#dee3e5',
+        'on-surface':                '#2e3335',
+        'on-surface-variant':        '#5a6062',
+        'inverse-surface':           '#0c0f10',
+        'inverse-on-surface':        '#9b9d9e',
+
+        'outline':                   '#767c7e',
+        'outline-variant':           '#aeb3b5',
+
+        'background':                '#f8f9fa',
+        'on-background':             '#2e3335',
+
+        'error':                     '#ac3434',
+        'error-dim':                 '#70030f',
+        'error-container':           '#f56965',
+        'on-error':                  '#fff7f6',
+        'on-error-container':        '#65000b',
+      },
+      borderRadius: {
+        DEFAULT: '0.5rem',
+        lg:      '1rem',
+        xl:      '1.5rem',
+        full:    '9999px',
+      },
+      fontFamily: {
+        headline: ['Manrope', 'sans-serif'],
+        body:     ['Inter', 'sans-serif'],
+        label:    ['Inter', 'sans-serif'],
+        sans:     ['Inter', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        'editorial': '0 20px 40px rgba(46, 51, 53, 0.06)',
+        'primary-glow': '0 8px 24px rgba(0, 92, 192, 0.2)',
+        'emerald-glow': '0 0 32px rgba(63, 185, 80, 0.35)',
+      },
+    },
+  },
+  plugins: [],
+}

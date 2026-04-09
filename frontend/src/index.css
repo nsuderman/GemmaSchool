@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ─────────────────────────────────────────────── */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #f8f9fa;
+  color: #2e3335;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6, .font-headline {
+  font-family: 'Manrope', sans-serif;
+}
+
+/* ─── Material Symbols ─────────────────────────────────── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+.material-symbols-filled {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ─── Stitch Utility Classes ───────────────────────────── */
+
+/* Glassmorphism — for floating AI panels, tooltips, overlays */
+.glass-panel {
+  background: rgba(248, 249, 250, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Top bar glass */
+.glass-topbar {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* AI Shimmer — gradient CTA buttons / hero sections */
+.ai-shimmer {
+  background: linear-gradient(135deg, #005cc0 0%, #a3c1ff 100%);
+}
+
+/* Soft editorial shadow — floating cards, modals */
+.editorial-shadow {
+  box-shadow: 0 20px 40px rgba(46, 51, 53, 0.06);
+}
+
+/* Ghost border — accessibility stroke at near-invisible opacity */
+.ghost-border {
+  border: 1px solid rgba(174, 179, 181, 0.15);
+}
+
+/* Emerald Glow — quest completion state */
+.emerald-glow {
+  box-shadow: 0 0 32px rgba(63, 185, 80, 0.35);
+}
+
+/* Shimmer loading skeleton */
+.shimmer {
+  background: linear-gradient(90deg, #ebeef0 25%, #f2f4f5 50%, #ebeef0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Ping animation for live indicators */
+@keyframes ping {
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+.animate-ping {
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* ─── Selection ─────────────────────────────────────────── */
+::selection {
+  background-color: #a3c1ff;
+  color: #003a7f;
+}
