@@ -68,7 +68,7 @@ rebuild:
 # ── Bypass setup wizard (dummy model for UI testing) ─────────
 .PHONY: mock-model
 mock-model:
-	@touch models/gemma-3-4b-it-q4_0.gguf
+	@touch models/gemma-4-e4b.gguf
 	@docker compose restart backend
 	@echo "  Mock model created — refresh http://localhost:$(FRONTEND_PORT) to skip setup wizard."
 

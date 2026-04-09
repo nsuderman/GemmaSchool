@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Pull a Gemma model into the running Ollama container.
 # Usage: ./scripts/ollama_pull.sh [model]
-# Default model: gemma3:4b
+# Default model: gemma4:4b
 
 set -euo pipefail
 
-MODEL="${1:-gemma3:4b}"
+MODEL="${1:-gemma4:4b}"
 OLLAMA_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
 
 echo "Pulling ${MODEL} via Ollama at ${OLLAMA_URL}..."

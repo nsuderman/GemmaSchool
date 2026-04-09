@@ -32,4 +32,4 @@ You are the lead engineer for **GemmaSchool**, a self-sovereign, local-first hom
 - **Idempotency:** Agents must check `Vault/Assets` and `Vault/Daily_Quests` before generating new content to save resources.
 - **Inference:** Use `OLLAMA_BASE_URL` env var (default `http://ollama:11434`) for all model calls. Prefer the OpenAI-compatible `/v1/chat/completions` endpoint.
 - **Standardized Messaging:** Use OpenAI-compatible JSON formats for all internal agent communication.
-- **Model Selection:** Default model is `gemma3:4b` (Gemma 3 E4B), set in `OLLAMA_MODEL` env var and written by the setup wizard on first run. E2B (`gemma3:2b`) is available for low-memory devices.
+- **Model Selection:** Default model is `gemma4:4b` (Gemma 4 E4B), set in `OLLAMA_MODEL` env var and written by the setup wizard on first run. E2B (`gemma4:2b`) is available for low-memory devices.

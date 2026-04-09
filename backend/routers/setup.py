@@ -22,7 +22,7 @@ _sessions: dict[str, dict] = {}
 # ── Schemas ───────────────────────────────────────────────────
 
 class SetupConfig(BaseModel):
-    model: str = "gemma3:4b"
+    model: str = "gemma4:4b"
 
 
 # ── Status ────────────────────────────────────────────────────

@@ -5,8 +5,8 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 // ── Model presets ─────────────────────────────────────────────
 const MODELS = [
   {
-    id: 'gemma3:4b',
-    name: 'Gemma 3 E4B',
+    id: 'gemma4:4b',
+    name: 'Gemma 4 E4B',
     size: '3.3 GB',
     ram: '6 GB RAM',
     badge: 'Recommended',
@@ -14,8 +14,8 @@ const MODELS = [
     desc: 'The default competition model. Best balance of speed, vision, and quality on CPU-only hardware.',
   },
   {
-    id: 'gemma3:2b',
-    name: 'Gemma 3 E2B',
+    id: 'gemma4:2b',
+    name: 'Gemma 4 E2B',
     size: '1.6 GB',
     ram: '4 GB RAM',
     badge: 'Lightweight',
@@ -23,8 +23,8 @@ const MODELS = [
     desc: 'Great for low-memory devices. Faster inference, slightly reduced reasoning.',
   },
   {
-    id: 'gemma3:12b',
-    name: 'Gemma 3 12B',
+    id: 'gemma4:12b',
+    name: 'Gemma 4 12B',
     size: '8.1 GB',
     ram: '16 GB RAM',
     badge: 'Advanced',

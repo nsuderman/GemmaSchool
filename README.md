@@ -9,7 +9,7 @@
 
 ![GemmaSchool Header](assets/header.png)
 
-> **GemmaSchool** is an AI-augmented, self-sovereign homeschooling ecosystem. It transforms static curriculum into an interactive "Quest" system, running entirely on local hardware via **Gemma 3** and **Ollama** — no accounts, no tokens, no cloud.
+> **GemmaSchool** is an AI-augmented, self-sovereign homeschooling ecosystem. It transforms static curriculum into an interactive "Quest" system, running entirely on local hardware via **Gemma 4** and **Ollama** — no accounts, no tokens, no cloud.
 
 ---
 
