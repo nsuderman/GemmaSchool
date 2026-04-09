@@ -46,6 +46,7 @@ services:
       - HOST_RAM_GB=${HOST_RAM_GB:-}
       - HOST_AVAILABLE_GB=${HOST_AVAILABLE_GB:-}
       - HOST_CPU_CORES=${HOST_CPU_CORES:-}
+      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-gemmaschool}
     depends_on:
       - llama-server
     restart: unless-stopped

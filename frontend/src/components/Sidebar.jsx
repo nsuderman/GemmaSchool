@@ -38,7 +38,7 @@ export default function Sidebar() {
           GemmaSchool
         </h1>
         <p className="text-[10px] uppercase tracking-widest text-outline mt-1 font-semibold">
-          Sovereign Learning
+          Local Learning
         </p>
       </div>
 

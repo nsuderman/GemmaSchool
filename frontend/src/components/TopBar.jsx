@@ -12,6 +12,8 @@ export default function TopBar() {
   const [llamaOk, setLlamaOk]         = useState(null)
   const [dropdownOpen, setDropdown]   = useState(false)
   const [showManage, setShowManage]   = useState(false)
+  const [shutdownConfirm, setShutdownConfirm] = useState(false)
+  const [shuttingDown, setShuttingDown]       = useState(false)
   const dropdownRef                    = useRef(null)
 
   const systemEvent    = useWSLatest('system.')
@@ -23,6 +25,7 @@ export default function TopBar() {
     const handler = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdown(false)
+        setShutdownConfirm(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -62,6 +65,17 @@ export default function TopBar() {
   }, [systemEvent])
 
   const isRestarting = systemEvent?.event === 'system.restarting' && !llamaOk
+
+  const handleShutdown = async () => {
+    if (!shutdownConfirm) { setShutdownConfirm(true); return }
+    setShuttingDown(true)
+    try {
+      await fetch(`${API}/system-settings/runtime/stop`, { method: 'POST' })
+    } catch (_) {}
+    setShuttingDown(false)
+    setShutdownConfirm(false)
+    setDropdown(false)
+  }
 
   const statusDot =
     isRestarting     ? 'bg-primary animate-ping' :
@@ -246,6 +260,34 @@ export default function TopBar() {
                   <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
                   <span className="font-semibold">Switch Profile</span>
                 </button>
+
+                {/* Power off — parent only */}
+                {isParent && (
+                  <>
+                    <div className="h-px bg-outline-variant/10 my-2" />
+                    <button
+                      onClick={handleShutdown}
+                      disabled={shuttingDown}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left ${
+                        shutdownConfirm
+                          ? 'bg-error/10 text-error hover:bg-error/20'
+                          : 'text-error/70 hover:bg-error/10 hover:text-error'
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {shuttingDown ? 'hourglass_empty' : 'power_settings_new'}
+                      </span>
+                      <div>
+                        <p className="font-semibold leading-tight">
+                          {shuttingDown ? 'Shutting down…' : shutdownConfirm ? 'Confirm power off?' : 'Power Off'}
+                        </p>
+                        {shutdownConfirm && !shuttingDown && (
+                          <p className="text-[10px]">Click again to stop all containers</p>
+                        )}
+                      </div>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           )}
