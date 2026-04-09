@@ -175,7 +175,7 @@ export default function Dashboard() {
               </span>
             </div>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Add GGUF models to <code className="font-mono text-primary">/models</code> then run the Architect to auto-generate your first semester plan.
+              Pull a Gemma model via Ollama in the setup wizard, then run the Architect to auto-generate your first semester plan.
             </p>
           </div>
         </section>
@@ -263,8 +263,8 @@ export default function Dashboard() {
               </div>
             </div>
             <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-              All four agents are initialized and awaiting tasks. The Auditor is ready for vision
-              analysis once Gemma 4 E4B Vision GGUF is loaded in <code className="font-mono text-primary">/models</code>.
+              All four agents are initialized and awaiting tasks. Pull a Gemma model via Ollama
+              to activate the full agent fleet.
             </p>
             <div className="flex gap-2">
               <button className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-lg hover:opacity-90 transition-opacity">

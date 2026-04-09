@@ -1,48 +1,35 @@
 services:
 
-  # ── llama-server ─────────────────────────────────────────────
-  # Starts only after setup completes (use 'docker-compose up llama-server'
-  # or start it via the setup wizard which writes the .env first).
-  llama-server:
-    image: ghcr.io/ggerganov/llama.cpp:server
-    container_name: gemmaschool-llama
-    profiles: [full]           # excluded from default 'docker-compose up'
+  # ── Ollama — model runtime (replaces llama-server) ───────────
+  # Starts with the base stack. Setup wizard pulls models on first run.
+  # Ollama is built on llama.cpp internally.
+  ollama:
+    image: ollama/ollama
+    container_name: gemmaschool-ollama
     volumes:
-      - ./models:/models
+      - ollama_data:/root/.ollama
     ports:
-      - "8080:8080"
-    command: >
-      -m /models/${LLAMA_MODEL:-gemma-3-4b-it-q4_0.gguf}
-      --host 0.0.0.0
-      --port 8080
-      --ctx-size ${LLAMA_CTX_SIZE:-4096}
-      --n-gpu-layers ${LLAMA_GPU_LAYERS:-0}
-      --threads ${LLAMA_THREADS:-4}
+      - "11434:11434"
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
 
-  # ── backend ───────────────────────────────────────────────────
-  # Starts immediately — serves the setup wizard on first run.
+  # ── Backend ───────────────────────────────────────────────────
   backend:
     build: ./backend
     container_name: gemmaschool-backend
     volumes:
       - ./vault:/vault
-      - ./models:/models
-      - .:/project          # allows backend to write .env after setup
+      - .:/project
     ports:
       - "8000:8000"
     environment:
-      - LLAMA_SERVER_URL=http://llama-server:8080
+      - OLLAMA_BASE_URL=http://ollama:11434
       - VAULT_PATH=/vault
       - FASTSD_URL=http://fastsd:7860
+    depends_on:
+      - ollama
     restart: unless-stopped
 
-  # ── frontend ──────────────────────────────────────────────────
+  # ── Frontend ──────────────────────────────────────────────────
   frontend:
     build: ./frontend
     container_name: gemmaschool-frontend
@@ -55,13 +42,16 @@ services:
       - backend
     restart: unless-stopped
 
-  # ── fastsd ───────────────────────────────────────────────────
+  # ── FastSD — local image generation ──────────────────────────
   fastsd:
     image: rupeshs/fastsdcpu:latest
     container_name: gemmaschool-fastsd
-    profiles: [full]           # excluded from default 'docker-compose up'
+    profiles: [full]
     volumes:
       - ./vault/Assets:/app/results
     ports:
       - "7860:7860"
     restart: unless-stopped
+
+volumes:
+  ollama_data:   # persists pulled models across container restarts

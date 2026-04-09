@@ -64,25 +64,29 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/health")
 async def health():
-    from pathlib import Path
-    llama_url = os.getenv("LLAMA_SERVER_URL", "http://localhost:8080")
-    models_dir = Path("/models")
-    model_file = os.getenv("LLAMA_MODEL", "")
+    import requests as _requests
+    ollama_url = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
+    ollama_model = os.getenv("OLLAMA_MODEL", "")
 
-    model_found = (models_dir / model_file).exists() if model_file else False
-    gguf_files = list(models_dir.glob("*.gguf")) if models_dir.exists() else []
+    try:
+        resp = _requests.get(f"{ollama_url}/api/tags", timeout=3)
+        models = [m["name"] for m in resp.json().get("models", [])]
+        ollama_ok = True
+    except Exception:
+        models = []
+        ollama_ok = False
 
     return {
         "status": "ok",
-        "llama_server": llama_url,
+        "ollama": ollama_url,
+        "ollama_reachable": ollama_ok,
         "vault_path": os.getenv("VAULT_PATH", "/vault"),
         "models": {
-            "expected": model_file,
-            "found": model_found,
-            "available": [f.name for f in gguf_files],
+            "configured": ollama_model,
+            "available": models,
             "hint": (
-                None if model_found
-                else "Run scripts/download_models.sh to fetch GGUF models from Hugging Face."
+                None if models
+                else "Use the setup wizard to pull a Gemma model via Ollama."
             ),
         },
     }
