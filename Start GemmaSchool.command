@@ -52,6 +52,14 @@ else
   ok "Docker already running"
 fi
 
+# ── Detect real host RAM (before Docker, so we see actual hardware) ──
+step "Detecting system hardware..."
+HOST_RAM_BYTES=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
+HOST_RAM_GB=$(( HOST_RAM_BYTES / 1024 / 1024 / 1024 ))
+HOST_CPU_CORES=$(sysctl -n hw.physicalcpu 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 0)
+export HOST_RAM_GB HOST_CPU_CORES
+ok "${HOST_RAM_GB} GB RAM · ${HOST_CPU_CORES} CPU cores detected"
+
 # ── Start GemmaSchool ─────────────────────────────────────────
 step "Starting GemmaSchool..."
 docker compose up --build -d

@@ -56,9 +56,22 @@ if %errorlevel% neq 0 (
 echo.
 echo   Docker is ready.
 
+:: ── Detect real host RAM ──────────────────────────────────────
+echo.
+echo [3/4] Detecting system hardware...
+for /f "tokens=2 delims==" %%A in ('wmic computersystem get TotalPhysicalMemory /value 2^>nul ^| findstr "="') do set HOST_RAM_BYTES=%%A
+if defined HOST_RAM_BYTES (
+    set /a HOST_RAM_GB=!HOST_RAM_BYTES! / 1073741824
+) else (
+    set HOST_RAM_GB=0
+)
+for /f "tokens=2 delims==" %%A in ('wmic cpu get NumberOfCores /value 2^>nul ^| findstr "="') do set HOST_CPU_CORES=%%A
+if not defined HOST_CPU_CORES set HOST_CPU_CORES=0
+echo   Detected: !HOST_RAM_GB! GB RAM, !HOST_CPU_CORES! CPU cores
+
 :: ── Start GemmaSchool ─────────────────────────────────────────
 echo.
-echo [3/4] Starting GemmaSchool...
+echo [4/5] Starting GemmaSchool...
 docker compose up --build -d
 if %errorlevel% neq 0 (
     echo.
@@ -69,7 +82,7 @@ if %errorlevel% neq 0 (
 
 :: ── Wait for frontend ─────────────────────────────────────────
 echo.
-echo [4/4] Waiting for the app to be ready...
+echo [5/5] Waiting for the app to be ready...
 :wait_frontend
 curl -s -o nul -w "%%{http_code}" http://localhost:5173 2>nul | findstr /r "200 304" >nul
 if %errorlevel% neq 0 (

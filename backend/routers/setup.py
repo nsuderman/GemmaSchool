@@ -30,10 +30,25 @@ class SetupConfig(BaseModel):
 
 @router.get("/sysinfo")
 async def sysinfo():
-    """Return host RAM, CPU count, and a recommended Ollama model."""
-    ram_bytes  = psutil.virtual_memory().total
-    ram_gb     = ram_bytes / (1024 ** 3)
-    cpu_cores  = psutil.cpu_count(logical=False) or psutil.cpu_count(logical=True)
+    """Return host RAM, CPU count, and a recommended Ollama model.
+
+    HOST_RAM_GB / HOST_CPU_CORES are injected by the launcher scripts
+    (sysctl on macOS, wmic on Windows) before Docker starts, giving the
+    real hardware values regardless of Docker memory limits.
+    """
+    # Prefer launcher-supplied host values — they are always accurate.
+    host_ram_env = os.getenv("HOST_RAM_GB", "").strip()
+    host_cpu_env = os.getenv("HOST_CPU_CORES", "").strip()
+
+    if host_ram_env and host_ram_env != "0":
+        ram_gb = float(host_ram_env)
+    else:
+        ram_gb = psutil.virtual_memory().total / (1024 ** 3)
+
+    if host_cpu_env and host_cpu_env != "0":
+        cpu_cores = int(host_cpu_env)
+    else:
+        cpu_cores = psutil.cpu_count(logical=False) or psutil.cpu_count(logical=True)
 
     if ram_gb >= 16:
         recommended = "gemma4:12b"

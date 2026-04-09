@@ -118,44 +118,20 @@ export default function SetupWizard({ onComplete }) {
   const [startError, setStartError] = useState(null)
   const sseRef = useRef(null)
 
-  // ── Detect RAM cross-platform ─────────────────────────────────
-  // navigator.deviceMemory runs in the real browser on the host OS (not
-  // inside Docker), so it's accurate on Windows and macOS. It caps at 8 GB,
-  // so we also ask the backend (psutil) and take the higher value.
+  // ── Fetch system info from backend ───────────────────────────
+  // The launcher scripts (Start GemmaSchool.command / .bat) detect real
+  // host RAM via sysctl/wmic before Docker starts and inject it as
+  // HOST_RAM_GB — so the backend always returns the true hardware value.
   useEffect(() => {
     if (step !== 1 || sysinfo) return
-
-    const browserRam = navigator.deviceMemory ?? null  // undefined in Firefox/Safari → null
-
     fetch(`${API}/setup/sysinfo`)
       .then((r) => r.json())
       .then((data) => {
-        // Use the higher of browser-detected vs Docker-visible RAM.
-        // Docker on Windows/Mac can under-report; browser is always the host.
-        const effectiveRam = browserRam
-          ? Math.max(browserRam, data.ram_gb)
-          : data.ram_gb
-
-        const recommended =
-          effectiveRam >= 16 ? 'gemma4:12b' :
-          effectiveRam >= 6  ? 'gemma4:4b'  : 'gemma4:2b'
-
-        const merged = { ...data, ram_gb: Math.round(effectiveRam * 10) / 10, recommended }
-        setSysinfo(merged)
-        const rec = MODELS.find((m) => m.id === recommended)
+        setSysinfo(data)
+        const rec = MODELS.find((m) => m.id === data.recommended)
         if (rec) setSelected(rec)
       })
-      .catch(() => {
-        // Backend not up yet — use browser RAM only if available
-        if (browserRam) {
-          const recommended =
-            browserRam >= 16 ? 'gemma4:12b' :
-            browserRam >= 6  ? 'gemma4:4b'  : 'gemma4:2b'
-          setSysinfo({ ram_gb: browserRam, cpu_cores: null, recommended })
-          const rec = MODELS.find((m) => m.id === recommended)
-          if (rec) setSelected(rec)
-        }
-      })
+      .catch(() => {/* backend not reachable yet — user can use dropdown */})
   }, [step])
 
   // ── SSE listener ─────────────────────────────────────────────

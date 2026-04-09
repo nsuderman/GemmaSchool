@@ -25,6 +25,8 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - VAULT_PATH=/vault
       - FASTSD_URL=http://fastsd:7860
+      - HOST_RAM_GB=${HOST_RAM_GB:-}
+      - HOST_CPU_CORES=${HOST_CPU_CORES:-}
     depends_on:
       - ollama
     restart: unless-stopped
