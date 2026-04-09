@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react'
-import { useWebSocket } from '../hooks/useWebSocket'
+import { useState, useEffect, useRef } from 'react'
+import { useWSEventsByPrefix } from '../contexts/WebSocketContext'
 import ActivityFeed from '../components/ActivityFeed'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 
 const AGENTS = [
   {
@@ -45,19 +46,22 @@ const AGENTS = [
 
 export default function AgentFleet() {
   const [agentStatus, setAgentStatus] = useState({})  // id -> 'idle' | 'running' | 'done' | 'error'
-  const [events, setEvents] = useState([])
+  const agentEvents = useWSEventsByPrefix('agent.')    // live from global WS context
+  const seenRef     = useRef(0)
 
-  const onMessage = useCallback((payload) => {
-    if (!payload.event?.startsWith('agent.')) return
-    const agent = payload.data?.agent
-    setEvents((prev) => [{ ...payload, ts: Date.now() }, ...prev].slice(0, 50))
-    if (payload.event === 'agent.task.start')    setAgentStatus((p) => ({ ...p, [agent]: 'running' }))
-    if (payload.event === 'agent.task.progress') setAgentStatus((p) => ({ ...p, [agent]: 'running' }))
-    if (payload.event === 'agent.task.complete') setAgentStatus((p) => ({ ...p, [agent]: 'done' }))
-    if (payload.event === 'agent.task.error')    setAgentStatus((p) => ({ ...p, [agent]: 'error' }))
-  }, [])
+  useEffect(() => {
+    const newEvents = agentEvents.slice(0, agentEvents.length - seenRef.current)
+    if (newEvents.length === 0) return
+    seenRef.current = agentEvents.length
 
-  useWebSocket(onMessage)
+    newEvents.forEach((payload) => {
+      const agent = payload.data?.agent
+      if (payload.event === 'agent.task.start')    setAgentStatus((p) => ({ ...p, [agent]: 'running' }))
+      if (payload.event === 'agent.task.progress') setAgentStatus((p) => ({ ...p, [agent]: 'running' }))
+      if (payload.event === 'agent.task.complete') setAgentStatus((p) => ({ ...p, [agent]: 'done' }))
+      if (payload.event === 'agent.task.error')    setAgentStatus((p) => ({ ...p, [agent]: 'error' }))
+    })
+  }, [agentEvents])
 
   const runAgent = async (agentId) => {
     setAgentStatus((p) => ({ ...p, [agentId]: 'running' }))
@@ -150,16 +154,8 @@ export default function AgentFleet() {
             <span className="material-symbols-outlined text-primary text-[20px]">sensors</span>
             <h3 className="font-headline font-bold text-on-surface">Live Activity</h3>
           </div>
-          {events.length > 0 && (
-            <button
-              onClick={() => setEvents([])}
-              className="text-xs text-on-surface-variant hover:text-on-surface font-bold"
-            >
-              Clear
-            </button>
-          )}
         </div>
-        <ActivityFeed events={events} maxHeight="max-h-[28rem]" />
+        <ActivityFeed events={agentEvents} maxHeight="max-h-[28rem]" />
       </section>
     </div>
   )

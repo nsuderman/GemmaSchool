@@ -421,3 +421,64 @@ def _write_env(model_name: str, model_file: str):
         env_path.write_text("\n".join(new_lines) + "\n")
     except Exception:
         pass   # non-fatal if /project not mounted
+
+
+# ── Restart llama-server ──────────────────────────────────────
+
+LLAMA_CONTAINER = "gemmaschool-llama"
+
+
+@router.post("/restart")
+async def restart_llama(request: Request):
+    """Restart the llama-server container to load the newly activated model."""
+    ws_manager = getattr(request.app.state, "ws_manager", None)
+
+    if ws_manager:
+        await ws_manager.broadcast("system.restarting", {
+            "message": "Switching model — llama-server is restarting…",
+        })
+
+    asyncio.create_task(_do_restart(ws_manager))
+    return {"ok": True, "message": "Restart initiated"}
+
+
+async def _do_restart(ws_manager):
+    llama_url = _env_value("LLAMA_BASE_URL", "http://llama-server:8080")
+    loop = asyncio.get_running_loop()
+
+    try:
+        import docker as docker_sdk
+
+        client = await loop.run_in_executor(None, docker_sdk.from_env)
+        container = await loop.run_in_executor(None, client.containers.get, LLAMA_CONTAINER)
+        await loop.run_in_executor(None, container.restart)
+
+    except ImportError:
+        if ws_manager:
+            await ws_manager.broadcast("system.restart_failed", {
+                "message": "docker SDK unavailable — restart manually.",
+                "command": f"docker restart {LLAMA_CONTAINER}",
+            })
+        return
+    except Exception as exc:
+        if ws_manager:
+            await ws_manager.broadcast("system.restart_failed", {
+                "message": f"Restart failed: {exc}",
+                "command": f"docker restart {LLAMA_CONTAINER}",
+            })
+        return
+
+    # Poll llama health until it's ready (model load can take a while)
+    for _ in range(40):
+        await asyncio.sleep(3)
+        try:
+            resp = requests.get(f"{llama_url}/health", timeout=3)
+            if resp.ok:
+                break
+        except Exception:
+            continue
+
+    if ws_manager:
+        await ws_manager.broadcast("system.online", {
+            "message": "llama-server restarted with new model.",
+        })

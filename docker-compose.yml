@@ -32,6 +32,7 @@ services:
     volumes:
       - ./vault:/vault
       - .:/project
+      - /var/run/docker.sock:/var/run/docker.sock  # allows backend to restart llama-server on model switch
     ports:
       - "8000:8000"
     environment:

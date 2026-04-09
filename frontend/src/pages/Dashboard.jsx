@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { useWebSocket } from '../hooks/useWebSocket'
+import { useWSEvents } from '../contexts/WebSocketContext'
 import ActivityFeed from '../components/ActivityFeed'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -22,13 +22,15 @@ const SUBJECTS = [
 ]
 
 export default function Dashboard() {
-  const [emerald, setEmerald] = useState(false)
-  const [events, setEvents] = useState([])
-  const [mentorNote, setMentorNote] = useState(
+  const allEvents  = useWSEvents()   // global shared stream
+  const seenRef    = useRef(0)       // track how many events we've processed
+
+  const [emerald, setEmerald]         = useState(false)
+  const [mentorNote, setMentorNote]   = useState(
     'Your vault has 0 Daily Quests. Run The Architect to begin your 180-day learning journey.'
   )
-  const [agentRunning, setAgentRunning] = useState({})  // agent name -> bool
-  const [activeModel, setActiveModel] = useState(null)
+  const [agentRunning, setAgentRunning] = useState({})
+  const [activeModel, setActiveModel]   = useState(null)
 
   useEffect(() => {
     fetch(`${API}/setup/models`)
@@ -40,37 +42,37 @@ export default function Dashboard() {
       .catch(() => {})
   }, [])
 
-  const onMessage = useCallback((payload) => {
-    setEvents((prev) => [{ ...payload, ts: Date.now() }, ...prev].slice(0, 25))
+  // Process only genuinely new events (allEvents is newest-first)
+  useEffect(() => {
+    const newEvents = allEvents.slice(0, allEvents.length - seenRef.current)
+    if (newEvents.length === 0) return
+    seenRef.current = allEvents.length
 
-    const { event, data = {} } = payload
-
-    if (event === 'quest.completed' || event === 'quest_completed') {
-      setEmerald(true)
-      setTimeout(() => setEmerald(false), 4000)
-    }
-    if (event === 'mentor_note') {
-      setMentorNote(data.message || mentorNote)
-    }
-    if (event === 'agent.task.start') {
-      setAgentRunning((p) => ({ ...p, [data.agent]: true }))
-    }
-    if (event === 'agent.task.complete' || event === 'agent.task.error') {
-      setAgentRunning((p) => ({ ...p, [data.agent]: false }))
-    }
-    if (event === 'model.activated') {
-      // Refresh active model display after activation
-      fetch(`${API}/setup/models`)
-        .then((r) => r.json())
-        .then((d) => {
-          const all = [...(d.models || []), ...(d.extra_models || [])]
-          setActiveModel(all.find((m) => m.active) || null)
-        })
-        .catch(() => {})
-    }
-  }, [])
-
-  useWebSocket(onMessage)
+    newEvents.forEach(({ event, data = {} }) => {
+      if (event === 'quest.completed' || event === 'quest_completed') {
+        setEmerald(true)
+        setTimeout(() => setEmerald(false), 4000)
+      }
+      if (event === 'mentor_note') {
+        setMentorNote(data.message || '')
+      }
+      if (event === 'agent.task.start') {
+        setAgentRunning((p) => ({ ...p, [data.agent]: true }))
+      }
+      if (event === 'agent.task.complete' || event === 'agent.task.error') {
+        setAgentRunning((p) => ({ ...p, [data.agent]: false }))
+      }
+      if (event === 'model.activated' || event === 'system.online') {
+        fetch(`${API}/setup/models`)
+          .then((r) => r.json())
+          .then((d) => {
+            const all = [...(d.models || []), ...(d.extra_models || [])]
+            setActiveModel(all.find((m) => m.active) || null)
+          })
+          .catch(() => {})
+      }
+    })
+  }, [allEvents])
 
   return (
     <div className="max-w-7xl mx-auto">
