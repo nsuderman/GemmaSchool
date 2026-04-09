@@ -6,30 +6,30 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const MODELS = [
   {
     id: 'gemma3:4b',
-    name: 'Gemma 3 4B',
+    name: 'Gemma 3 E4B',
     size: '3.3 GB',
     ram: '6 GB RAM',
     badge: 'Recommended',
     badgeColor: 'bg-secondary-container text-on-secondary-container',
-    desc: 'Best balance of speed and quality on CPU-only hardware.',
+    desc: 'The default competition model. Best balance of speed, vision, and quality on CPU-only hardware.',
+  },
+  {
+    id: 'gemma3:2b',
+    name: 'Gemma 3 E2B',
+    size: '1.6 GB',
+    ram: '4 GB RAM',
+    badge: 'Lightweight',
+    badgeColor: 'bg-tertiary-container text-on-tertiary-container',
+    desc: 'Great for low-memory devices. Faster inference, slightly reduced reasoning.',
   },
   {
     id: 'gemma3:12b',
     name: 'Gemma 3 12B',
     size: '8.1 GB',
     ram: '16 GB RAM',
-    badge: 'Higher Quality',
+    badge: 'Advanced',
     badgeColor: 'bg-primary-container text-on-primary-container',
-    desc: 'Stronger reasoning and writing. Requires more RAM.',
-  },
-  {
-    id: 'gemma3:27b',
-    name: 'Gemma 3 27B',
-    size: '17 GB',
-    ram: '32 GB RAM',
-    badge: 'Maximum',
-    badgeColor: 'bg-surface-container-high text-on-surface-variant',
-    desc: 'Best quality. Only suitable for high-memory machines.',
+    desc: 'Significantly stronger reasoning. Requires a high-memory machine.',
   },
 ]
 
