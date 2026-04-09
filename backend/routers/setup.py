@@ -5,6 +5,7 @@ import threading
 import uuid
 from pathlib import Path
 
+import psutil
 import requests
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -23,6 +24,29 @@ _sessions: dict[str, dict] = {}
 
 class SetupConfig(BaseModel):
     model: str = "gemma4:4b"
+
+
+# ── System info ───────────────────────────────────────────────
+
+@router.get("/sysinfo")
+async def sysinfo():
+    """Return host RAM, CPU count, and a recommended Ollama model."""
+    ram_bytes  = psutil.virtual_memory().total
+    ram_gb     = ram_bytes / (1024 ** 3)
+    cpu_cores  = psutil.cpu_count(logical=False) or psutil.cpu_count(logical=True)
+
+    if ram_gb >= 16:
+        recommended = "gemma4:12b"
+    elif ram_gb >= 6:
+        recommended = "gemma4:4b"
+    else:
+        recommended = "gemma4:2b"
+
+    return {
+        "ram_gb":      round(ram_gb, 1),
+        "cpu_cores":   cpu_cores,
+        "recommended": recommended,
+    }
 
 
 # ── Status ────────────────────────────────────────────────────

@@ -108,11 +108,27 @@ export default function SetupWizard({ onComplete }) {
   // Form state
   const [selectedModel, setSelected] = useState(MODELS[0])
 
+  // System info
+  const [sysinfo, setSysinfo] = useState(null)
+
   // Download state
   const [sessionId, setSessionId]   = useState(null)
   const [dlState, setDlState]       = useState(null)
   const [startError, setStartError] = useState(null)
   const sseRef = useRef(null)
+
+  // ── Fetch system info when entering model-select step ────────
+  useEffect(() => {
+    if (step !== 1 || sysinfo) return
+    fetch(`${API}/setup/sysinfo`)
+      .then((r) => r.json())
+      .then((data) => {
+        setSysinfo(data)
+        const rec = MODELS.find((m) => m.id === data.recommended)
+        if (rec) setSelected(rec)
+      })
+      .catch(() => {/* backend not up yet — silently ignore */})
+  }, [step])
 
   // ── SSE listener ─────────────────────────────────────────────
   useEffect(() => {
@@ -256,9 +272,36 @@ export default function SetupWizard({ onComplete }) {
                 </p>
               </div>
 
+              {/* Hardware info card */}
+              {sysinfo ? (
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { icon: 'memory',     label: 'System RAM',  value: `${sysinfo.ram_gb} GB` },
+                    { icon: 'developer_board', label: 'CPU Cores', value: sysinfo.cpu_cores },
+                    { icon: 'recommend',  label: 'Best Fit',    value: MODELS.find(m => m.id === sysinfo.recommended)?.name ?? sysinfo.recommended },
+                  ].map((s) => (
+                    <div key={s.label} className="bg-surface-container-low rounded-xl p-4 text-center">
+                      <span className="material-symbols-outlined text-primary text-xl block mb-1">{s.icon}</span>
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{s.label}</p>
+                      <p className="text-sm font-bold text-on-surface mt-0.5">{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  {[0,1,2].map(i => (
+                    <div key={i} className="h-20 shimmer rounded-xl" />
+                  ))}
+                </div>
+              )}
+
               {/* Model cards */}
               <div className="space-y-3">
-                {MODELS.map((m) => (
+                {MODELS.map((m) => {
+                  const ramRequired = parseFloat(m.ram)
+                  const fits = sysinfo ? sysinfo.ram_gb >= ramRequired : true
+                  const isRec = sysinfo?.recommended === m.id
+                  return (
                   <button
                     key={m.id}
                     onClick={() => setSelected(m)}
@@ -277,16 +320,26 @@ export default function SetupWizard({ onComplete }) {
                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${m.badgeColor}`}>
                             {m.badge}
                           </span>
+                          {isRec && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary text-on-secondary">
+                              Your System
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-on-surface-variant">{m.desc}</p>
                       </div>
-                      <div className="text-right flex-shrink-0">
+                      <div className="text-right flex-shrink-0 space-y-1">
                         <p className="text-sm font-bold text-on-surface">{m.size}</p>
-                        <p className="text-[10px] text-on-surface-variant">{m.ram}</p>
+                        <p className={`text-[10px] font-semibold ${fits ? 'text-secondary' : 'text-error'}`}>
+                          {fits
+                            ? `${m.ram} ✓`
+                            : `${m.ram} — needs more`}
+                        </p>
                       </div>
                     </div>
                   </button>
-                ))}
+                  )
+                })}
               </div>
 
               {startError && (
