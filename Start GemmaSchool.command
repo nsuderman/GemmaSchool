@@ -14,7 +14,7 @@ ok()    { echo -e "  ${GREEN}✓ $1${RESET}"; }
 info()  { echo -e "  ${YELLOW}→ $1${RESET}"; }
 abort() { echo -e "\n${RED}${BOLD}✗ $1${RESET}\n"; exit 1; }
 
-clear
+clear 2>/dev/null || true
 echo -e "${BOLD}"
 echo "  ╔════════════════════════════════════╗"
 echo "  ║      🎓  GemmaSchool               ║"
@@ -71,3 +71,5 @@ echo -e "\n  ${GREEN}${BOLD}GemmaSchool is running.${RESET}"
 echo -e "  Visit ${BLUE}${FRONTEND_URL}${RESET} anytime.\n"
 echo "  To stop: quit OrbStack from the menu bar, or run 'make stop'."
 echo ""
+echo "  Closing this window in 3 seconds..."
+sleep 3
