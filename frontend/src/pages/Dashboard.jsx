@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useWebSocket } from '../hooks/useWebSocket'
+import ActivityFeed from '../components/ActivityFeed'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -25,132 +27,50 @@ export default function Dashboard() {
   const [mentorNote, setMentorNote] = useState(
     'Your vault has 0 Daily Quests. Run The Architect to begin your 180-day learning journey.'
   )
-  const [modelState, setModelState] = useState(null)
-  const [selectedModelId, setSelectedModelId] = useState('')
-  const [modelBusy, setModelBusy] = useState(false)
-  const [modelError, setModelError] = useState('')
-  const [modelMessage, setModelMessage] = useState('')
-  const [downloadPct, setDownloadPct] = useState(null)
-
-  const loadModels = useCallback(async () => {
-    const res = await fetch(`${API}/setup/models`)
-    if (!res.ok) throw new Error('Failed to load model list')
-    const data = await res.json()
-    setModelState(data)
-
-    const all = [...(data.models || []), ...(data.extra_models || [])]
-    const active = all.find((m) => m.active)
-    setSelectedModelId((prev) => {
-      if (active) return active.id
-      if (prev && all.some((m) => m.id === prev)) return prev
-      return all[0]?.id || ''
-    })
-  }, [])
+  const [agentRunning, setAgentRunning] = useState({})  // agent name -> bool
+  const [activeModel, setActiveModel] = useState(null)
 
   useEffect(() => {
-    loadModels().catch(() => {
-      setModelError('Could not load model manager right now.')
-    })
-  }, [loadModels])
+    fetch(`${API}/setup/models`)
+      .then((r) => r.json())
+      .then((data) => {
+        const all = [...(data.models || []), ...(data.extra_models || [])]
+        setActiveModel(all.find((m) => m.active) || null)
+      })
+      .catch(() => {})
+  }, [])
 
   const onMessage = useCallback((payload) => {
-    setEvents((prev) => [payload, ...prev].slice(0, 10))
-    if (payload.event === 'quest_completed') {
+    setEvents((prev) => [{ ...payload, ts: Date.now() }, ...prev].slice(0, 25))
+
+    const { event, data = {} } = payload
+
+    if (event === 'quest.completed' || event === 'quest_completed') {
       setEmerald(true)
       setTimeout(() => setEmerald(false), 4000)
     }
-    if (payload.event === 'mentor_note') {
-      setMentorNote(payload.data?.message || mentorNote)
+    if (event === 'mentor_note') {
+      setMentorNote(data.message || mentorNote)
+    }
+    if (event === 'agent.task.start') {
+      setAgentRunning((p) => ({ ...p, [data.agent]: true }))
+    }
+    if (event === 'agent.task.complete' || event === 'agent.task.error') {
+      setAgentRunning((p) => ({ ...p, [data.agent]: false }))
+    }
+    if (event === 'model.activated') {
+      // Refresh active model display after activation
+      fetch(`${API}/setup/models`)
+        .then((r) => r.json())
+        .then((d) => {
+          const all = [...(d.models || []), ...(d.extra_models || [])]
+          setActiveModel(all.find((m) => m.active) || null)
+        })
+        .catch(() => {})
     }
   }, [])
 
   useWebSocket(onMessage)
-
-  const allModels = [...(modelState?.models || []), ...(modelState?.extra_models || [])]
-  const selectedModel = allModels.find((m) => m.id === selectedModelId)
-
-  const downloadSelectedModel = async () => {
-    if (!selectedModel || !selectedModel.url || modelBusy) return
-
-    setModelBusy(true)
-    setModelError('')
-    setModelMessage('Starting download...')
-    setDownloadPct(0)
-
-    try {
-      const res = await fetch(`${API}/setup/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_name: selectedModel.id }),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail || 'Failed to start download')
-      }
-
-      const { session_id } = await res.json()
-      const es = new EventSource(`${API}/setup/progress/${session_id}`)
-
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          setDownloadPct(data?.file?.pct ?? null)
-
-          if (data.status === 'complete') {
-            es.close()
-            setModelBusy(false)
-            setModelMessage('Download complete. Model target updated.')
-            setDownloadPct(null)
-            loadModels().catch(() => {})
-          } else if (data.status === 'error') {
-            es.close()
-            setModelBusy(false)
-            setModelError(data.error || 'Download failed')
-            setDownloadPct(null)
-          }
-        } catch {
-          // ignore malformed events
-        }
-      }
-
-      es.onerror = () => {
-        es.close()
-        setModelBusy(false)
-        setModelError('Download stream interrupted')
-      }
-    } catch (err) {
-      setModelBusy(false)
-      setDownloadPct(null)
-      setModelError(String(err))
-    }
-  }
-
-  const activateSelectedModel = async () => {
-    if (!selectedModel || !selectedModel.downloaded || modelBusy) return
-
-    setModelBusy(true)
-    setModelError('')
-    setModelMessage('Activating selected model...')
-
-    try {
-      const modelName = selectedModel.url ? selectedModel.id : selectedModel.file
-      const res = await fetch(`${API}/setup/activate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_name: modelName }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Failed to activate model')
-
-      setModelMessage(data.message || 'Model activated.')
-      await loadModels()
-    } catch (err) {
-      setModelError(String(err))
-    } finally {
-      setModelBusy(false)
-    }
-  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -220,7 +140,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Subject Progress — bento medium */}
+        {/* Subject Progress */}
         <section className="col-span-12 md:col-span-8 bg-surface-container-low rounded-xl p-8 relative overflow-hidden">
           <div className="absolute -right-16 -top-16 w-64 h-64 bg-primary-container/10 rounded-full blur-3xl pointer-events-none" />
           <div className="relative z-10">
@@ -259,150 +179,78 @@ export default function Dashboard() {
         <section className="col-span-12 md:col-span-5 bg-surface-container-lowest rounded-xl p-8 editorial-shadow">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-headline font-bold text-on-surface">Agent Fleet</h3>
-            <span className="material-symbols-outlined text-outline text-[20px]">more_horiz</span>
+            <Link to="/agents" className="text-primary text-xs font-bold hover:underline flex items-center gap-1">
+              Manage
+              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+            </Link>
           </div>
           <div className="space-y-5">
-            {AGENTS.map((agent) => (
-              <div key={agent.name} className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center flex-shrink-0">
-                  <span className={`material-symbols-outlined ${agent.color} text-[20px]`}>
-                    {agent.icon}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-semibold text-on-surface">{agent.name}</span>
-                    <span className="text-xs text-secondary font-bold">Ready</span>
+            {AGENTS.map((agent) => {
+              const running = agentRunning[agent.id?.toLowerCase()] || agentRunning[agent.name.toLowerCase()]
+              return (
+                <div key={agent.name} className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center flex-shrink-0">
+                    <span className={`material-symbols-outlined ${agent.color} text-[20px]`}>
+                      {agent.icon}
+                    </span>
                   </div>
-                  <p className="text-xs text-on-surface-variant">{agent.desc}</p>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-semibold text-on-surface">{agent.name}</span>
+                      <span className={`text-xs font-bold ${running ? 'text-primary' : 'text-secondary'}`}>
+                        {running ? 'Running' : 'Ready'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-on-surface-variant">{agent.desc}</p>
+                  </div>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${running ? 'bg-primary animate-pulse' : 'bg-secondary'}`} />
                 </div>
-                <span className="w-2 h-2 rounded-full bg-secondary flex-shrink-0" />
+              )
+            })}
+          </div>
+
+          {/* Active model chip */}
+          <div className="mt-6 p-4 bg-surface-container-low rounded-lg flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-primary text-[16px]">memory</span>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Active Model</p>
+                <p className="text-xs font-semibold text-on-surface truncate">
+                  {activeModel ? activeModel.label : 'No model active'}
+                </p>
               </div>
-            ))}
-          </div>
-
-          {/* AI Insight chip */}
-          <div className="mt-6 p-4 bg-tertiary-container/10 rounded-lg">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-tertiary text-[16px]">lightbulb</span>
-              <span className="text-[10px] font-bold text-tertiary uppercase tracking-wider">
-                AI Suggestion
-              </span>
             </div>
-            <p className="text-xs text-on-surface-variant leading-relaxed">
-              Download a Gemma GGUF in the setup wizard, then run the Architect to auto-generate your first semester plan.
-            </p>
-          </div>
-
-          <div className="mt-4 p-4 bg-surface-container-low rounded-lg space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">
-                Model Runtime
-              </p>
-              {selectedModel?.active && (
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container">
-                  Active
-                </span>
-              )}
-            </div>
-
-            <select
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              className="w-full bg-surface-container rounded-lg px-3 py-2 text-xs text-on-surface border-none focus:outline-none focus:ring-1 focus:ring-primary/30"
-              disabled={modelBusy || allModels.length === 0}
+            <Link
+              to="/settings"
+              className="text-[10px] font-bold text-primary hover:underline flex-shrink-0 flex items-center gap-0.5"
             >
-              {allModels.length === 0 ? (
-                <option value="">No models found</option>
-              ) : (
-                allModels.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label} {m.downloaded ? '(downloaded)' : '(not downloaded)'}
-                  </option>
-                ))
-              )}
-            </select>
-
-            {downloadPct != null && (
-              <p className="text-[11px] text-primary font-semibold">Downloading... {downloadPct}%</p>
-            )}
-            {modelError && (
-              <p className="text-[11px] text-error">{modelError}</p>
-            )}
-            {modelMessage && !modelError && (
-              <p className="text-[11px] text-on-surface-variant">{modelMessage}</p>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                onClick={downloadSelectedModel}
-                disabled={modelBusy || !selectedModel || selectedModel.downloaded || !selectedModel.url}
-                className="px-3 py-2 bg-primary text-on-primary text-xs font-bold rounded-lg disabled:opacity-40"
-              >
-                Download
-              </button>
-              <button
-                onClick={activateSelectedModel}
-                disabled={modelBusy || !selectedModel || !selectedModel.downloaded || selectedModel.active}
-                className="px-3 py-2 ghost-border text-xs font-bold rounded-lg text-on-surface disabled:opacity-40"
-              >
-                Activate
-              </button>
-            </div>
-
-            <p className="text-[10px] text-on-surface-variant leading-relaxed">
-              After switching models, restart GemmaSchool to ensure llama.cpp loads the new weights.
-            </p>
+              Change
+              <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+            </Link>
           </div>
         </section>
 
-        {/* Live Event Feed */}
+        {/* Live Activity Feed */}
         <section className="col-span-12 md:col-span-7 space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="font-headline font-bold text-lg text-on-surface">Recent Activity</h3>
-            <button className="text-primary text-xs font-bold hover:underline">View All</button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-[20px]">sensors</span>
+              <h3 className="font-headline font-bold text-lg text-on-surface">Live Activity</h3>
+            </div>
+            {events.length > 0 && (
+              <button
+                onClick={() => setEvents([])}
+                className="text-xs text-on-surface-variant hover:text-on-surface font-bold"
+              >
+                Clear
+              </button>
+            )}
           </div>
-
-          {events.length === 0 ? (
-            <div className="bg-surface-container-lowest rounded-xl p-8 text-center editorial-shadow">
-              <span className="material-symbols-outlined text-outline text-4xl block mb-3">
-                radio_button_unchecked
-              </span>
-              <p className="text-on-surface-variant text-sm">
-                Awaiting student activity via WebSocket...
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {events.map((ev, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-4 p-4 bg-surface-container-lowest rounded-xl hover:bg-primary-container/10 transition-colors cursor-pointer editorial-shadow"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center flex-shrink-0">
-                    <span className="material-symbols-outlined text-primary text-[18px]">
-                      bolt
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-primary uppercase tracking-widest mb-0.5">
-                      {ev.event}
-                    </p>
-                    <p className="text-sm font-semibold text-on-surface truncate">
-                      {JSON.stringify(ev.data)}
-                    </p>
-                  </div>
-                  <span className="material-symbols-outlined text-outline text-[18px]">
-                    arrow_forward_ios
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <ActivityFeed events={events} maxHeight="max-h-[26rem]" />
         </section>
       </div>
 
-      {/* ── Recent Summaries — asymmetric editorial layout ── */}
+      {/* ── Recent Summaries ── */}
       <section className="mt-16">
         <h3 className="font-headline font-bold text-2xl text-on-surface mb-8">Vault Summaries</h3>
         <div className="flex flex-wrap gap-8 items-start">
@@ -421,13 +269,12 @@ export default function Dashboard() {
             </div>
             <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
               Once the Architect generates Daily Quests, the Knowledge Grove will render a
-              live force-directed graph of every quest and its cross-subject connections —
-              built right into the app.
+              live force-directed graph of every quest and its cross-subject connections.
             </p>
-            <a href="/vault" className="text-sm font-bold text-primary flex items-center gap-2 hover:gap-3 transition-all">
+            <Link to="/vault" className="text-sm font-bold text-primary flex items-center gap-2 hover:gap-3 transition-all">
               Open Knowledge Grove
               <span className="material-symbols-outlined text-sm">trending_flat</span>
-            </a>
+            </Link>
           </div>
 
           <div className="w-full md:w-[48%] bg-surface-container-high/50 p-8 rounded-xl mt-12">
@@ -443,12 +290,18 @@ export default function Dashboard() {
               to activate the full agent fleet.
             </p>
             <div className="flex gap-2">
-              <button className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-lg hover:opacity-90 transition-opacity">
-                Run Architect
-              </button>
-              <button className="px-4 py-2 ghost-border text-xs font-bold rounded-lg hover:bg-surface-container transition-colors text-on-surface">
-                View Docs
-              </button>
+              <Link
+                to="/agents"
+                className="px-4 py-2 bg-primary text-on-primary text-xs font-bold rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Agent Fleet
+              </Link>
+              <Link
+                to="/settings"
+                className="px-4 py-2 ghost-border text-xs font-bold rounded-lg hover:bg-surface-container transition-colors text-on-surface"
+              >
+                Download Model
+              </Link>
             </div>
           </div>
         </div>

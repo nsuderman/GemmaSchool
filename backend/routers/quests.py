@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pathlib import Path
 import os
 import re
@@ -28,7 +28,7 @@ async def get_quest(quest_name: str):
 
 
 @router.patch("/{quest_name}/complete")
-async def complete_quest(quest_name: str, request: dict):
+async def complete_quest(quest_name: str, req: Request):
     safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "", quest_name)
     path = QUESTS_DIR / f"{safe_name}.md"
     if not path.exists():
@@ -37,5 +37,9 @@ async def complete_quest(quest_name: str, request: dict):
     content = path.read_text()
     content = content.replace("status: pending", "status: completed", 1)
     path.write_text(content)
+
+    ws_manager = getattr(req.app.state, "ws_manager", None)
+    if ws_manager:
+        await ws_manager.broadcast("quest.completed", {"quest": safe_name})
 
     return {"name": safe_name, "status": "completed"}

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import psutil
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -37,6 +37,16 @@ MODEL_CATALOG = {
 
 # ── Shared session state ──────────────────────────────────────
 _sessions: dict[str, dict] = {}
+
+
+def _ws_emit(ws_manager, loop, event: str, data: dict):
+    """Fire-and-forget WebSocket broadcast from a background thread."""
+    if ws_manager is None or loop is None:
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(ws_manager.broadcast(event, data), loop)
+    except Exception:
+        pass
 
 
 def _env_value(key: str, default: str = "") -> str:
@@ -170,7 +180,7 @@ async def list_models():
 
 
 @router.post("/activate")
-async def activate_model(config: ActivateConfig):
+async def activate_model(config: ActivateConfig, request: Request):
     requested_model = (config.model or config.model_name or "").strip()
     if not requested_model:
         raise HTTPException(status_code=400, detail="Missing model name")
@@ -178,15 +188,26 @@ async def activate_model(config: ActivateConfig):
     if requested_model in MODEL_CATALOG:
         model_file = MODEL_CATALOG[requested_model]["file"]
         model_name = requested_model
+        label = MODEL_CATALOG[requested_model]["label"]
     else:
         model_file = requested_model
         model_name = requested_model.replace(".gguf", "")
+        label = model_file
 
     source_path = MODELS_DIR / model_file
     if not source_path.exists() or source_path.stat().st_size == 0:
         raise HTTPException(status_code=404, detail=f"Model file '{model_file}' not found")
 
     _write_env(model_name, model_file)
+
+    ws_manager = getattr(request.app.state, "ws_manager", None)
+    loop = getattr(request.app.state, "loop", None)
+    _ws_emit(ws_manager, loop, "model.activated", {
+        "model_id": model_name,
+        "label": label,
+        "file": model_file,
+        "restart_required": True,
+    })
 
     return {
         "ok": True,
@@ -200,7 +221,7 @@ async def activate_model(config: ActivateConfig):
 # ── Start pull ────────────────────────────────────────────────
 
 @router.post("/start")
-async def start_setup(config: SetupConfig):
+async def start_setup(config: SetupConfig, request: Request):
     requested_model = (config.model or config.model_name or "gemma4:e2b").strip()
     if requested_model not in MODEL_CATALOG:
         raise HTTPException(status_code=400, detail=f"Unknown model '{requested_model}'")
@@ -223,9 +244,12 @@ async def start_setup(config: SetupConfig):
     }
     _sessions[session_id]["files"] = {model_meta["file"]: _sessions[session_id]["file"]}
 
+    ws_manager = getattr(request.app.state, "ws_manager", None)
+    loop = getattr(request.app.state, "loop", None)
+
     thread = threading.Thread(
         target=_download_model,
-        args=(session_id, requested_model),
+        args=(session_id, requested_model, ws_manager, loop),
         daemon=True,
     )
     thread.start()
@@ -262,7 +286,7 @@ async def stream_progress(session_id: str):
 
 # ── Background pull worker ────────────────────────────────────
 
-def _download_model(session_id: str, model_key: str):
+def _download_model(session_id: str, model_key: str, ws_manager=None, loop=None):
     state   = _sessions[session_id]
     f_state = state["file"]
     model_meta = MODEL_CATALOG[model_key]
@@ -270,6 +294,12 @@ def _download_model(session_id: str, model_key: str):
 
     state["status"]  = "downloading"
     f_state["status"] = "downloading"
+
+    _ws_emit(ws_manager, loop, "model.download.start", {
+        "model_id": model_key,
+        "label": model_meta["label"],
+        "file": model_meta["file"],
+    })
 
     try:
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
@@ -283,12 +313,19 @@ def _download_model(session_id: str, model_key: str):
             })
             state["status"] = "complete"
             _write_env(model_key, model_meta["file"])
+            _ws_emit(ws_manager, loop, "model.download.complete", {
+                "model_id": model_key,
+                "label": model_meta["label"],
+                "file": model_meta["file"],
+                "cached": True,
+            })
             return
 
         with requests.get(model_meta["url"], stream=True, timeout=30) as resp:
             resp.raise_for_status()
             total = int(resp.headers.get("content-length", 0))
             downloaded = 0
+            last_emitted_pct = -1
 
             f_state.update({"total": total, "downloaded": 0, "pct": 0})
 
@@ -298,15 +335,32 @@ def _download_model(session_id: str, model_key: str):
                         continue
                     out.write(chunk)
                     downloaded += len(chunk)
+                    pct = round(downloaded / total * 100, 1) if total else 0
                     f_state.update({
                         "downloaded": downloaded,
-                        "pct": round(downloaded / total * 100, 1) if total else 0,
+                        "pct": pct,
                         "status": "downloading",
                     })
+                    # Emit WS progress every 10% to avoid flooding the feed
+                    if pct - last_emitted_pct >= 10:
+                        _ws_emit(ws_manager, loop, "model.download.progress", {
+                            "model_id": model_key,
+                            "label": model_meta["label"],
+                            "pct": pct,
+                            "downloaded_mb": round(downloaded / 1024 ** 2, 1),
+                            "total_mb": round(total / 1024 ** 2, 1),
+                        })
+                        last_emitted_pct = pct
 
         f_state.update({"status": "done", "pct": 100, "layer": "downloaded"})
         state["status"] = "complete"
         _write_env(model_key, model_meta["file"])
+        _ws_emit(ws_manager, loop, "model.download.complete", {
+            "model_id": model_key,
+            "label": model_meta["label"],
+            "file": model_meta["file"],
+            "cached": False,
+        })
 
     except Exception as exc:
         if target_path.exists() and target_path.stat().st_size == 0:
@@ -317,6 +371,11 @@ def _download_model(session_id: str, model_key: str):
         state["status"] = "error"
         state["error"]  = str(exc)
         f_state["status"] = "error"
+        _ws_emit(ws_manager, loop, "model.download.error", {
+            "model_id": model_key,
+            "label": model_meta["label"],
+            "error": str(exc),
+        })
 
 
 # ── Write .env ────────────────────────────────────────────────

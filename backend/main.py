@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import asyncio
 import os
 import json
 from pathlib import Path
@@ -51,6 +52,12 @@ manager = ConnectionManager()
 
 # Make manager available to routers
 app.state.ws_manager = manager
+
+
+@app.on_event("startup")
+async def _capture_loop():
+    """Store the running event loop so background threads can broadcast via WS."""
+    app.state.loop = asyncio.get_running_loop()
 
 MODEL_FILE_TO_ID = {
     "gemma-4-E2B-it-Q4_K_M.gguf": "gemma4:e2b",

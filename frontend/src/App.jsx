@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard'
 import QuestBoard from './pages/QuestBoard'
 import KnowledgeGrove from './pages/KnowledgeGrove'
 import SetupWizard from './pages/SetupWizard'
+import Settings from './pages/Settings'
+import AgentFleet from './pages/AgentFleet'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -44,9 +46,11 @@ export default function App() {
       <TopBar />
       <main className="ml-64 pt-20 pb-12 px-8 min-h-screen">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/quests" element={<QuestBoard />} />
-          <Route path="/vault"  element={<KnowledgeGrove />} />
+          <Route path="/"         element={<Dashboard />} />
+          <Route path="/quests"   element={<QuestBoard />} />
+          <Route path="/vault"    element={<KnowledgeGrove />} />
+          <Route path="/agents"   element={<AgentFleet />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
 

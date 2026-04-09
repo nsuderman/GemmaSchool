@@ -1,29 +1,36 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 
 export function useWebSocket(onMessage) {
-  const ws = useRef(null)
-  const url = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/ws`
+  const onMsgRef = useRef(onMessage)
+  onMsgRef.current = onMessage
 
-  const connect = useCallback(() => {
-    ws.current = new WebSocket(url)
+  useEffect(() => {
+    let unmounted = false
+    const url = `${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/ws`
+    let socket = null
 
-    ws.current.onmessage = (e) => {
-      try {
-        const payload = JSON.parse(e.data)
-        onMessage?.(payload)
-      } catch {
-        // ignore malformed messages
+    const connect = () => {
+      if (unmounted) return
+      socket = new WebSocket(url)
+
+      socket.onmessage = (e) => {
+        try {
+          const payload = JSON.parse(e.data)
+          onMsgRef.current?.(payload)
+        } catch {
+          // ignore malformed messages
+        }
+      }
+
+      socket.onclose = () => {
+        if (!unmounted) setTimeout(connect, 3000)
       }
     }
 
-    ws.current.onclose = () => {
-      // Reconnect after 3s on unexpected close
-      setTimeout(connect, 3000)
-    }
-  }, [url, onMessage])
-
-  useEffect(() => {
     connect()
-    return () => ws.current?.close()
-  }, [connect])
+    return () => {
+      unmounted = true
+      socket?.close()
+    }
+  }, []) // stable — onMessage changes don't re-open the socket
 }
