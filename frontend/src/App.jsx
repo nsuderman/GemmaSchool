@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import Dashboard from './pages/Dashboard'
 import QuestBoard from './pages/QuestBoard'
+import QuestLoad from './pages/QuestLoad'
 import KnowledgeGrove from './pages/KnowledgeGrove'
 import SetupWizard from './pages/SetupWizard'
 import Settings from './pages/Settings'
+import CalendarSettings from './pages/CalendarSettings'
 import AgentFleet from './pages/AgentFleet'
 import ProfilePicker from './pages/ProfilePicker'
 import { useProfile } from './contexts/ProfileContext'
@@ -55,25 +57,16 @@ export default function App() {
       <main className="ml-64 pt-20 pb-12 px-8 min-h-screen">
         <Routes>
           <Route path="/"         element={<Dashboard />} />
+          <Route path="/quest-load" element={<QuestLoad />} />
           <Route path="/quests"   element={<QuestBoard />} />
           <Route path="/vault"    element={<KnowledgeGrove />} />
           <Route path="/agents"   element={<AgentFleet />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/settings" element={<Navigate to="/settings/model-manager" replace />} />
+          <Route path="/settings/model-manager" element={<Settings />} />
+          <Route path="/settings/calendar" element={<CalendarSettings />} />
         </Routes>
       </main>
 
-      {/* Floating AI Assistant */}
-      <div className="fixed bottom-8 right-8 z-50">
-        <button className="w-16 h-16 glass-panel ghost-border rounded-full editorial-shadow flex items-center justify-center hover:scale-110 active:scale-95 transition-all">
-          <span className="material-symbols-outlined text-primary text-3xl material-symbols-filled">
-            support_agent
-          </span>
-          <span className="absolute -top-1 -right-1 flex h-4 w-4">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
-            <span className="relative inline-flex rounded-full h-4 w-4 bg-primary" />
-          </span>
-        </button>
-      </div>
     </div>
   )
 }

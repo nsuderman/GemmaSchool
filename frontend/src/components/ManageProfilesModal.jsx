@@ -18,6 +18,7 @@ function EditProfilePanel({ profile, onClose }) {
   const [color, setColor]   = useState(profile.color)
   const [pin, setPin]       = useState('')
   const [pin2, setPin2]     = useState('')
+  const [gradeLevel, setGradeLevel] = useState(profile.grade_level || '')
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -33,6 +34,7 @@ function EditProfilePanel({ profile, onClose }) {
     setSaving(true); setError('')
     try {
       const body = { name: name.trim(), color }
+      if (profile.role === 'student') body.grade_level = gradeLevel.trim()
       if (pin) body.pin = pin
       await updateProfile(profile.id, body)
       onClose()
@@ -127,6 +129,18 @@ function EditProfilePanel({ profile, onClose }) {
         </div>
       </div>
 
+      {profile.role === 'student' && (
+        <div>
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1.5">Grade Level</label>
+          <input
+            value={gradeLevel}
+            onChange={(e) => setGradeLevel(e.target.value)}
+            placeholder="e.g. 4, 7, 10, Kindergarten"
+            className="w-full bg-surface-container-high rounded-xl px-3 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+      )}
+
       {error && <p className="text-xs text-error font-semibold">{error}</p>}
 
       <button
@@ -174,6 +188,7 @@ function AddProfilePanel({ onClose }) {
   const [name, setName]     = useState('')
   const [role, setRole]     = useState('student')
   const [color, setColor]   = useState('secondary')
+  const [gradeLevel, setGradeLevel] = useState('')
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -183,7 +198,13 @@ function AddProfilePanel({ onClose }) {
     if (!name.trim()) { setError('Name is required'); return }
     setSaving(true); setError('')
     try {
-      await createProfile({ name: name.trim(), role, color, pin: null })
+      await createProfile({
+        name: name.trim(),
+        role,
+        color,
+        pin: null,
+        grade_level: role === 'student' ? gradeLevel.trim() : null,
+      })
       onClose()
     } catch (e) {
       setError(e.message)
@@ -252,6 +273,18 @@ function AddProfilePanel({ onClose }) {
         </div>
       </div>
 
+      {role === 'student' && (
+        <div>
+          <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1.5">Grade Level</label>
+          <input
+            value={gradeLevel}
+            onChange={(e) => setGradeLevel(e.target.value)}
+            placeholder="e.g. 4, 7, 10, Kindergarten"
+            className="w-full bg-surface-container-high rounded-xl px-3 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+      )}
+
       <p className="text-[11px] text-on-surface-variant">PIN will be set on first sign-in.</p>
 
       {error && <p className="text-xs text-error font-semibold">{error}</p>}
@@ -304,7 +337,12 @@ export default function ManageProfilesModal({ onClose }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-on-surface">{p.name}</p>
-                      <p className="text-[10px] text-on-surface-variant capitalize">{p.role} · {p.has_pin ? 'PIN set' : 'No PIN'}</p>
+                      <p className="text-[10px] text-on-surface-variant capitalize">
+                        {p.role}
+                        {p.role === 'student' && p.grade_level ? ` · Grade ${p.grade_level}` : ''}
+                        {' · '}
+                        {p.has_pin ? 'PIN set' : 'No PIN'}
+                      </p>
                     </div>
                     <span className="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
                   </button>

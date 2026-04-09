@@ -285,7 +285,7 @@ export default function SetupWizard({ onComplete }) {
                   <div className="grid grid-cols-4 gap-3">
                     {[
                       { icon: 'memory',          label: 'Total RAM',     value: `${ramOverride ?? sysinfo.ram_gb} GB` },
-                      { icon: 'battery_charging_full', label: 'Free RAM', value: `${sysinfo.available_gb} GB`,
+                      { icon: 'memory_alt', label: 'Free RAM', value: `${sysinfo.available_gb} GB`,
                         sub: sysinfo.available_gb < 4 ? 'Low — close apps' : null },
                       { icon: 'developer_board', label: 'CPU Cores',     value: sysinfo.cpu_cores ?? '—' },
                       { icon: 'recommend',       label: 'Best Fit',      value: MODELS.find(m => m.id === sysinfo.recommended)?.name ?? sysinfo.recommended },

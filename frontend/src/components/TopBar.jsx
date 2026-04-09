@@ -150,7 +150,7 @@ export default function TopBar() {
 
                 {/* Model Manager — parent only */}
                 <button
-                  onClick={() => { navigate('/settings'); setDropdown(false) }}
+                  onClick={() => { navigate('/settings/model-manager'); setDropdown(false) }}
                   disabled={!isParent}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left ${
                     isParent
@@ -161,7 +161,27 @@ export default function TopBar() {
                   <span className="material-symbols-outlined text-[18px] text-primary">memory</span>
                   <div>
                     <p className="font-semibold leading-tight">Model Manager</p>
-                    <p className="text-[10px] text-on-surface-variant">Download &amp; switch Gemma models</p>
+                    <p className="text-[10px] text-on-surface-variant">Download and switch models</p>
+                  </div>
+                  {!isParent && (
+                    <span className="ml-auto material-symbols-outlined text-[14px] text-outline">lock</span>
+                  )}
+                </button>
+
+                {/* Calendar Settings — parent only */}
+                <button
+                  onClick={() => { navigate('/settings/calendar'); setDropdown(false) }}
+                  disabled={!isParent}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left ${
+                    isParent
+                      ? 'text-on-surface hover:bg-surface-container-high cursor-pointer'
+                      : 'text-on-surface-variant opacity-40 cursor-not-allowed'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[18px] text-tertiary">calendar_month</span>
+                  <div>
+                    <p className="font-semibold leading-tight">Calendar</p>
+                    <p className="text-[10px] text-on-surface-variant">Holidays, vacations, and trips</p>
                   </div>
                   {!isParent && (
                     <span className="ml-auto material-symbols-outlined text-[14px] text-outline">lock</span>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWSLatest } from '../contexts/WebSocketContext'
+import { useProfile } from '../contexts/ProfileContext'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -176,6 +177,8 @@ function AvailableModelCard({ model, sysinfo, busy, downloadPct, error, onDownlo
 
 // ── Main Settings page ─────────────────────────────────────────
 export default function Settings() {
+  const { activeProfile } = useProfile()
+  const isParent = activeProfile?.role === 'parent'
   const [sysinfo, setSysinfo]       = useState(null)
   const [modelData, setModelData]   = useState(null)
   const [switching, setSwitching]   = useState(false)
@@ -218,6 +221,17 @@ export default function Settings() {
       if (models) setModelData(models)
     })
   }, [])
+
+  if (!isParent) {
+    return (
+      <div className="max-w-4xl mx-auto pt-8">
+        <div className="bg-surface-container-lowest rounded-xl p-8 editorial-shadow">
+          <h2 className="text-2xl font-headline font-bold text-on-surface">Parent Access Required</h2>
+          <p className="text-on-surface-variant mt-2">Model Manager is available to parent profiles only.</p>
+        </div>
+      </div>
+    )
+  }
 
   const allModels   = [...(modelData?.models || []), ...(modelData?.extra_models || [])]
   const activeModel = allModels.find((m) => m.active) || null
@@ -315,7 +329,7 @@ export default function Settings() {
         <div className="flex flex-wrap gap-3">
           {[
             { icon: 'memory',               label: 'Total RAM',  val: `${sysinfo.ram_gb} GB` },
-            { icon: 'battery_charging_full', label: 'Free RAM',   val: `${sysinfo.available_gb} GB`, warn: sysinfo.available_gb < 4 },
+            { icon: 'memory_alt',            label: 'Free RAM',   val: `${sysinfo.available_gb} GB`, warn: sysinfo.available_gb < 4 },
             { icon: 'developer_board',       label: 'CPU Cores',  val: sysinfo.cpu_cores },
           ].map((s) => (
             <div key={s.label} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs ${s.warn ? 'bg-error/10 text-error' : 'bg-surface-container-low text-on-surface-variant'}`}>
@@ -380,7 +394,6 @@ export default function Settings() {
         </section>
       )}
 
-      {/* Runtime config footer */}
       <section className="border-t border-outline-variant/10 pt-6 space-y-3">
         <p className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Runtime Config</p>
         <div className="grid grid-cols-2 gap-3 text-xs font-mono">

@@ -20,7 +20,9 @@ services:
       - -np
       - "1"
       - -c
-      - "8192"
+      - "${LLAMA_CTX_SIZE:-12288}"
+      - -b
+      - "${LLAMA_BATCH_SIZE:-1024}"
       - -ngl
       - "0"
     restart: unless-stopped
@@ -42,6 +44,7 @@ services:
       - VAULT_PATH=/vault
       - FASTSD_URL=http://fastsd:7860
       - HOST_RAM_GB=${HOST_RAM_GB:-}
+      - HOST_AVAILABLE_GB=${HOST_AVAILABLE_GB:-}
       - HOST_CPU_CORES=${HOST_CPU_CORES:-}
     depends_on:
       - llama-server

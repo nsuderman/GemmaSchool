@@ -6,7 +6,7 @@ import os
 import json
 from pathlib import Path
 
-from routers import quests, agents, setup, vault, profiles
+from routers import quests, agents, setup, vault, profiles, curriculum, system_settings, curriculum_planner, calendar
 
 load_dotenv()
 
@@ -25,6 +25,10 @@ app.include_router(quests.router,   prefix="/quests",   tags=["quests"])
 app.include_router(agents.router,   prefix="/agents",   tags=["agents"])
 app.include_router(vault.router,    prefix="/vault",    tags=["vault"])
 app.include_router(profiles.router, prefix="/profiles", tags=["profiles"])
+app.include_router(curriculum.router, prefix="/curriculum", tags=["curriculum"])
+app.include_router(system_settings.router, prefix="/system-settings", tags=["system-settings"])
+app.include_router(curriculum_planner.router, prefix="/planner", tags=["planner"])
+app.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
 
 
 # --- WebSocket Connection Manager ---

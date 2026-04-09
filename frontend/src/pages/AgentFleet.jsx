@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useWSEventsByPrefix } from '../contexts/WebSocketContext'
 import ActivityFeed from '../components/ActivityFeed'
+import AgentThinkingSpinner from '../components/AgentThinkingSpinner'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -132,7 +133,7 @@ export default function AgentFleet() {
               >
                 {isRunning ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-on-surface-variant border-t-transparent rounded-full animate-spin" />
+                    <AgentThinkingSpinner />
                     Running…
                   </>
                 ) : (

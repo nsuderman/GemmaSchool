@@ -40,6 +40,13 @@ def _strip_pin(p: dict) -> dict:
     return result
 
 
+def _normalize_grade(grade_level: str | None) -> str | None:
+    if grade_level is None:
+        return None
+    value = str(grade_level).strip()
+    return value or None
+
+
 # ── Request bodies ────────────────────────────────────────────
 
 class CreateProfileBody(BaseModel):
@@ -47,12 +54,14 @@ class CreateProfileBody(BaseModel):
     role: str = "student"        # 'parent' | 'student'
     color: str = "primary"
     pin: str | None = None       # raw 4-digit PIN; None = no PIN
+    grade_level: str | None = None
 
 
 class UpdateProfileBody(BaseModel):
     name: str | None = None
     color: str | None = None
     pin: str | None = None       # new PIN; empty string = remove PIN
+    grade_level: str | None = None
 
 
 class VerifyPinBody(BaseModel):
@@ -73,9 +82,17 @@ def list_profiles():
             "role": "parent",
             "color": "primary",
             "pin_hash": None,
+            "grade_level": None,
         }
         _save([default])
         profiles = [default]
+    changed = False
+    for p in profiles:
+        if "grade_level" not in p:
+            p["grade_level"] = None
+            changed = True
+    if changed:
+        _save(profiles)
     return {"profiles": [_strip_pin(p) for p in profiles]}
 
 
@@ -92,6 +109,7 @@ def create_profile(body: CreateProfileBody):
         "role": body.role,
         "color": body.color,
         "pin_hash": _hash_pin(body.pin) if body.pin else None,
+        "grade_level": _normalize_grade(body.grade_level) if body.role == "student" else None,
     }
     profiles.append(new_profile)
     _save(profiles)
@@ -109,6 +127,8 @@ def update_profile(profile_id: str, body: UpdateProfileBody):
                 p["color"] = body.color
             if body.pin is not None:
                 p["pin_hash"] = _hash_pin(body.pin) if body.pin else None
+            if body.grade_level is not None:
+                p["grade_level"] = _normalize_grade(body.grade_level) if p.get("role") == "student" else None
             _save(profiles)
             return _strip_pin(p)
     raise HTTPException(404, "Profile not found")

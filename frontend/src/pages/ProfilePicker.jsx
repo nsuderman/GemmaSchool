@@ -18,6 +18,7 @@ function AddProfileModal({ onClose, onCreated }) {
   const [name, setName]     = useState('')
   const [role, setRole]     = useState('student')
   const [color, setColor]   = useState('secondary')
+  const [gradeLevel, setGradeLevel] = useState('')
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -30,7 +31,13 @@ function AddProfileModal({ onClose, onCreated }) {
     setError('')
     try {
       // Create without PIN — picker will prompt to set one on first select
-      await createProfile({ name: name.trim(), role, color, pin: null })
+      await createProfile({
+        name: name.trim(),
+        role,
+        color,
+        pin: null,
+        grade_level: role === 'student' ? gradeLevel.trim() : null,
+      })
       onCreated()
     } catch (e) {
       setError(e.message)
@@ -106,6 +113,18 @@ function AddProfileModal({ onClose, onCreated }) {
           </div>
         </div>
 
+        {role === 'student' && (
+          <div>
+            <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1.5">Grade Level</label>
+            <input
+              value={gradeLevel}
+              onChange={(e) => setGradeLevel(e.target.value)}
+              placeholder="e.g. 4, 7, 10, Kindergarten"
+              className="w-full bg-surface-container-high rounded-xl px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+        )}
+
         <p className="text-[11px] text-on-surface-variant">
           A PIN will be created on first sign-in.
         </p>
@@ -145,7 +164,9 @@ function ProfileCard({ profile, onSelect }) {
       </div>
       <div className="text-center">
         <p className="font-headline font-bold text-on-surface text-sm">{profile.name}</p>
-        <p className="text-[10px] text-on-surface-variant capitalize mt-0.5">{profile.role}</p>
+        <p className="text-[10px] text-on-surface-variant capitalize mt-0.5">
+          {profile.role}{profile.role === 'student' && profile.grade_level ? ` · Grade ${profile.grade_level}` : ''}
+        </p>
       </div>
     </button>
   )

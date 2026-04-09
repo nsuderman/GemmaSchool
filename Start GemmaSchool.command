@@ -57,7 +57,17 @@ step "Detecting system hardware..."
 HOST_RAM_BYTES=$(sysctl -n hw.memsize 2>/dev/null || echo 0)
 HOST_RAM_GB=$(( HOST_RAM_BYTES / 1024 / 1024 / 1024 ))
 HOST_CPU_CORES=$(sysctl -n hw.physicalcpu 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 0)
-export HOST_RAM_GB HOST_CPU_CORES
+VM_LINE=$(vm_stat 2>/dev/null | awk '/^Mach Virtual Memory Statistics/ {gsub("[^0-9]", "", $8); print $8; exit}')
+PAGE_SIZE=${VM_LINE:-16384}
+FREE_PAGES=$(vm_stat 2>/dev/null | awk '/Pages free/ {gsub("\.", "", $3); print $3; exit}')
+INACTIVE_PAGES=$(vm_stat 2>/dev/null | awk '/Pages inactive/ {gsub("\.", "", $3); print $3; exit}')
+SPECULATIVE_PAGES=$(vm_stat 2>/dev/null | awk '/Pages speculative/ {gsub("\.", "", $3); print $3; exit}')
+FREE_PAGES=${FREE_PAGES:-0}
+INACTIVE_PAGES=${INACTIVE_PAGES:-0}
+SPECULATIVE_PAGES=${SPECULATIVE_PAGES:-0}
+HOST_AVAILABLE_BYTES=$(( (FREE_PAGES + INACTIVE_PAGES + SPECULATIVE_PAGES) * PAGE_SIZE ))
+HOST_AVAILABLE_GB=$(( HOST_AVAILABLE_BYTES / 1024 / 1024 / 1024 ))
+export HOST_RAM_GB HOST_AVAILABLE_GB HOST_CPU_CORES
 ok "${HOST_RAM_GB} GB RAM · ${HOST_CPU_CORES} CPU cores detected"
 
 # ── Start GemmaSchool ─────────────────────────────────────────

@@ -86,6 +86,7 @@ async def sysinfo():
     # Prefer launcher-supplied host values — they are always accurate.
     host_ram_env = os.getenv("HOST_RAM_GB", "").strip()
     host_cpu_env = os.getenv("HOST_CPU_CORES", "").strip()
+    host_avail_env = os.getenv("HOST_AVAILABLE_GB", "").strip()
 
     vm = psutil.virtual_memory()
 
@@ -99,8 +100,11 @@ async def sysinfo():
     else:
         cpu_cores = psutil.cpu_count(logical=False) or psutil.cpu_count(logical=True)
 
-    # Available RAM is always live from psutil — reflects current usage on host.
-    available_gb = vm.available / (1024 ** 3)
+    # Prefer launcher-supplied host available memory when present.
+    if host_avail_env and host_avail_env != "0":
+        available_gb = float(host_avail_env)
+    else:
+        available_gb = vm.available / (1024 ** 3)
 
     # Recommend based on available RAM so we don't suggest a model that
     # won't fit alongside whatever the user already has running.

@@ -65,9 +65,15 @@ if defined HOST_RAM_BYTES (
 ) else (
     set HOST_RAM_GB=0
 )
+for /f "tokens=2 delims==" %%A in ('wmic OS get FreePhysicalMemory /value 2^>nul ^| findstr "="') do set HOST_FREE_KB=%%A
+if defined HOST_FREE_KB (
+    set /a HOST_AVAILABLE_GB=!HOST_FREE_KB! / 1048576
+) else (
+    set HOST_AVAILABLE_GB=0
+)
 for /f "tokens=2 delims==" %%A in ('wmic cpu get NumberOfCores /value 2^>nul ^| findstr "="') do set HOST_CPU_CORES=%%A
 if not defined HOST_CPU_CORES set HOST_CPU_CORES=0
-echo   Detected: !HOST_RAM_GB! GB RAM, !HOST_CPU_CORES! CPU cores
+echo   Detected: !HOST_RAM_GB! GB RAM ^(!HOST_AVAILABLE_GB! GB free^), !HOST_CPU_CORES! CPU cores
 
 :: ── Start GemmaSchool ─────────────────────────────────────────
 echo.

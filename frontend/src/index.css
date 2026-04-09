@@ -84,3 +84,30 @@ h1, h2, h3, h4, h5, h6, .font-headline {
   background-color: #a3c1ff;
   color: #003a7f;
 }
+
+/* Agent thinking bars */
+.agent-thinking-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 20px;
+}
+
+.agent-thinking-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: #58a6ff;
+  transform-origin: bottom;
+  animation: agent-bars-wave 0.9s ease-in-out infinite;
+}
+
+.agent-thinking-bar:nth-child(1) { height: 8px;  animation-delay: 0s; }
+.agent-thinking-bar:nth-child(2) { height: 14px; animation-delay: 0.15s; }
+.agent-thinking-bar:nth-child(3) { height: 20px; animation-delay: 0.3s; }
+.agent-thinking-bar:nth-child(4) { height: 14px; animation-delay: 0.45s; }
+.agent-thinking-bar:nth-child(5) { height: 8px;  animation-delay: 0.6s; }
+
+@keyframes agent-bars-wave {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}

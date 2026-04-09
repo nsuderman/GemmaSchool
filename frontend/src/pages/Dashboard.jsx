@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useWSEvents } from '../contexts/WebSocketContext'
+import { useProfile } from '../contexts/ProfileContext'
 import ActivityFeed from '../components/ActivityFeed'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -22,6 +23,8 @@ const SUBJECTS = [
 ]
 
 export default function Dashboard() {
+  const { activeProfile } = useProfile()
+  const isParent = activeProfile?.role === 'parent'
   const allEvents  = useWSEvents()   // global shared stream
   const seenRef    = useRef(0)       // track how many events we've processed
 
@@ -31,6 +34,7 @@ export default function Dashboard() {
   )
   const [agentRunning, setAgentRunning] = useState({})
   const [activeModel, setActiveModel]   = useState(null)
+  const [scheduleStats, setScheduleStats] = useState(null)
 
   useEffect(() => {
     fetch(`${API}/setup/models`)
@@ -41,6 +45,50 @@ export default function Dashboard() {
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    fetch(`${API}/vault/graph`)
+      .then((r) => r.json())
+      .then((data) => {
+        const nodes = data?.nodes || []
+        const completed = nodes.filter((n) => n.status === 'completed').length
+        const dayValues = nodes
+          .map((n) => Number(n.day || 0))
+          .filter((d) => Number.isFinite(d) && d > 0)
+
+        const totalPlanned = dayValues.length > 0 ? Math.max(...dayValues) : nodes.length
+        const pendingDays = nodes
+          .filter((n) => n.status !== 'completed')
+          .map((n) => Number(n.day || 0))
+          .filter((d) => Number.isFinite(d) && d > 0)
+          .sort((a, b) => a - b)
+        const nextDay = pendingDays[0] || null
+
+        const weekStart = Math.floor(completed / 5) * 5 + 1
+        const weekEnd = Math.min(weekStart + 4, totalPlanned || weekStart + 4)
+        const plannedThisWeek = nodes.filter((n) => {
+          const d = Number(n.day || 0)
+          return d >= weekStart && d <= weekEnd
+        }).length
+        const completedThisWeek = nodes.filter((n) => {
+          const d = Number(n.day || 0)
+          return n.status === 'completed' && d >= weekStart && d <= weekEnd
+        }).length
+
+        setScheduleStats({
+          completed,
+          totalPlanned,
+          remaining: Math.max((totalPlanned || 0) - completed, 0),
+          pct: totalPlanned > 0 ? Math.round((completed / totalPlanned) * 100) : 0,
+          nextDay,
+          weekStart,
+          weekEnd,
+          plannedThisWeek,
+          completedThisWeek,
+        })
+      })
+      .catch(() => setScheduleStats(null))
+  }, [allEvents.length])
 
   // Process only genuinely new events (allEvents is newest-first)
   useEffect(() => {
@@ -108,39 +156,79 @@ export default function Dashboard() {
       {/* ── Bento Grid ─────────────────────────────────── */}
       <div className="grid grid-cols-12 gap-6">
 
-        {/* Emerald Glow + Streak — primary hero card */}
-        <section
-          className={`col-span-12 md:col-span-4 rounded-xl p-8 flex flex-col justify-between transition-all duration-700 ${
-            emerald
-              ? 'bg-secondary text-on-secondary emerald-glow'
-              : 'bg-primary text-on-primary shadow-primary-glow'
-          }`}
-        >
-          <div>
+        {/* Primary hero card */}
+        {isParent ? (
+          <section className="col-span-12 md:col-span-4 rounded-xl p-8 bg-primary text-on-primary shadow-primary-glow">
             <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-6">
               <span className="material-symbols-outlined text-white text-2xl material-symbols-filled">
-                {emerald ? 'check_circle' : 'emoji_events'}
+                timeline
               </span>
             </div>
-            <h3 className="text-2xl font-headline font-bold leading-tight mb-2">
-              {emerald ? 'Quest Complete!' : 'Daily Challenge'}
-            </h3>
+            <h3 className="text-2xl font-headline font-bold leading-tight mb-2">Student Schedule</h3>
             <p className="text-white/80 text-sm leading-relaxed">
-              {emerald
-                ? 'The Emerald Glow activates. Knowledge grows.'
-                : 'Complete 3 quests today to unlock the Weekend Explorer badge.'}
+              {scheduleStats?.nextDay
+                ? `Currently progressing through Day ${scheduleStats.nextDay} of ${scheduleStats.totalPlanned || 180}.`
+                : 'No pending day found yet. Generate quests to establish the schedule.'}
             </p>
-          </div>
-          <div className="mt-8">
-            <div className="flex justify-between text-xs font-bold mb-2">
-              <span>Weekly Streak</span>
-              <span>0 Days</span>
+
+            <div className="mt-8 space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span>Completed</span>
+                <span>{scheduleStats?.completed ?? 0}</span>
+              </div>
+              <div className="flex justify-between text-xs font-bold">
+                <span>Remaining</span>
+                <span>{scheduleStats?.remaining ?? 0}</span>
+              </div>
+              <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-secondary-container rounded-full transition-all duration-500"
+                  style={{ width: `${scheduleStats?.pct ?? 0}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-white/80">
+                <span>Plan Coverage</span>
+                <span>{scheduleStats?.pct ?? 0}%</span>
+              </div>
+              <div className="text-[11px] text-white/80 pt-1">
+                Week {Math.ceil((scheduleStats?.weekStart || 1) / 5)} · Days {scheduleStats?.weekStart || 1}-{scheduleStats?.weekEnd || 5} · {scheduleStats?.completedThisWeek || 0}/{scheduleStats?.plannedThisWeek || 0} complete
+              </div>
             </div>
-            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-              <div className="h-full bg-secondary-container w-0 rounded-full transition-all duration-500" />
+          </section>
+        ) : (
+          <section
+            className={`col-span-12 md:col-span-4 rounded-xl p-8 flex flex-col justify-between transition-all duration-700 ${
+              emerald
+                ? 'bg-secondary text-on-secondary emerald-glow'
+                : 'bg-primary text-on-primary shadow-primary-glow'
+            }`}
+          >
+            <div>
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mb-6">
+                <span className="material-symbols-outlined text-white text-2xl material-symbols-filled">
+                  {emerald ? 'check_circle' : 'emoji_events'}
+                </span>
+              </div>
+              <h3 className="text-2xl font-headline font-bold leading-tight mb-2">
+                {emerald ? 'Quest Complete!' : 'Daily Challenge'}
+              </h3>
+              <p className="text-white/80 text-sm leading-relaxed">
+                {emerald
+                  ? 'The Emerald Glow activates. Knowledge grows.'
+                  : 'Complete 3 quests today to unlock the Weekend Explorer badge.'}
+              </p>
             </div>
-          </div>
-        </section>
+            <div className="mt-8">
+              <div className="flex justify-between text-xs font-bold mb-2">
+                <span>Weekly Streak</span>
+                <span>0 Days</span>
+              </div>
+              <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                <div className="h-full bg-secondary-container w-0 rounded-full transition-all duration-500" />
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Subject Progress */}
         <section className="col-span-12 md:col-span-8 bg-surface-container-low rounded-xl p-8 relative overflow-hidden">
@@ -223,7 +311,7 @@ export default function Dashboard() {
               </div>
             </div>
             <Link
-              to="/settings"
+              to="/settings/model-manager"
               className="text-[10px] font-bold text-primary hover:underline flex-shrink-0 flex items-center gap-0.5"
             >
               Change

@@ -33,3 +33,10 @@ You are the lead engineer for **GemmaSchool**, a self-sovereign, local-first hom
 - **Inference:** Use `LLAMA_BASE_URL` env var (default `http://llama-server:8080`) for all model calls.
 - **Standardized Messaging:** Use OpenAI-compatible JSON formats for all internal agent communication.
 - **Model Selection:** Default model is `gemma4:e2b` with `LLAMA_MODEL_FILE=gemma-4-E2B-it-Q4_K_M.gguf`, written by the setup wizard on first run. E4B (`gemma4:e4b`) and 26B (`gemma4:26b`) are available for higher-memory devices.
+
+## Chronos Agent Hybrid Strategy
+- **Primary:** Use intent-first routing for Chronos scheduler requests.
+- **Step 1:** Detect intent from user prompt (calendar CRUD/holiday import/listing vs general chat).
+- **Step 2:** For known calendar intents, bypass model tool loops and execute deterministic Python tools directly.
+- **Step 3:** Use LLM response generation for natural-language guidance/encouragement and non-tool conversation.
+- **Stability Flag:** Keep full PydanticAI tool-loop behind `CHRONOS_STABLE_TOOLING=1` for future llama.cpp tool parser maturity.
