@@ -279,32 +279,36 @@ export default function SetupWizard({ onComplete }) {
               {/* Hardware info card */}
               {sysinfo ? (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-4 gap-3">
                     {[
-                      { icon: 'memory',          label: 'System RAM',  value: `${ramOverride ?? sysinfo.ram_gb} GB` },
-                      { icon: 'developer_board', label: 'CPU Cores',   value: sysinfo.cpu_cores ?? '—' },
-                      { icon: 'recommend',       label: 'Best Fit',    value: MODELS.find(m => m.id === sysinfo.recommended)?.name ?? sysinfo.recommended },
+                      { icon: 'memory',          label: 'Total RAM',     value: `${ramOverride ?? sysinfo.ram_gb} GB` },
+                      { icon: 'battery_charging_full', label: 'Free RAM', value: `${sysinfo.available_gb} GB`,
+                        sub: sysinfo.available_gb < 4 ? 'Low — close apps' : null },
+                      { icon: 'developer_board', label: 'CPU Cores',     value: sysinfo.cpu_cores ?? '—' },
+                      { icon: 'recommend',       label: 'Best Fit',      value: MODELS.find(m => m.id === sysinfo.recommended)?.name ?? sysinfo.recommended },
                     ].map((s) => (
-                      <div key={s.label} className="bg-surface-container-low rounded-xl p-4 text-center">
-                        <span className="material-symbols-outlined text-primary text-xl block mb-1">{s.icon}</span>
+                      <div key={s.label} className={`bg-surface-container-low rounded-xl p-4 text-center ${s.sub ? 'ring-1 ring-error/40' : ''}`}>
+                        <span className={`material-symbols-outlined text-xl block mb-1 ${s.sub ? 'text-error' : 'text-primary'}`}>{s.icon}</span>
                         <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">{s.label}</p>
-                        <p className="text-sm font-bold text-on-surface mt-0.5">{s.value}</p>
+                        <p className={`text-sm font-bold mt-0.5 ${s.sub ? 'text-error' : 'text-on-surface'}`}>{s.value}</p>
+                        {s.sub && <p className="text-[9px] text-error mt-0.5">{s.sub}</p>}
                       </div>
                     ))}
                   </div>
-                  {/* Manual RAM override — shown if Docker may have under-reported */}
+                  {/* Manual RAM override — fallback if launcher didn't inject HOST_RAM_GB */}
                   <div className="flex items-center gap-2 text-[11px] text-on-surface-variant">
                     <span className="material-symbols-outlined text-[14px] text-outline">info</span>
-                    RAM looks wrong?
+                    Total RAM looks wrong?
                     <select
                       value={ramOverride ?? ''}
                       onChange={(e) => {
                         const gb = Number(e.target.value) || null
                         setRamOverride(gb)
                         if (gb) {
+                          const avail = sysinfo.available_gb
                           const recommended =
-                            gb >= 16 ? 'gemma4:12b' :
-                            gb >= 6  ? 'gemma4:4b'  : 'gemma4:2b'
+                            avail >= 14 ? 'gemma4:12b' :
+                            avail >= 5  ? 'gemma4:4b'  : 'gemma4:2b'
                           setSysinfo((s) => ({ ...s, ram_gb: gb, recommended }))
                           const rec = MODELS.find((m) => m.id === recommended)
                           if (rec) setSelected(rec)
@@ -331,7 +335,7 @@ export default function SetupWizard({ onComplete }) {
               <div className="space-y-3">
                 {MODELS.map((m) => {
                   const ramRequired = parseFloat(m.ram)
-                  const effectiveRam = ramOverride ?? sysinfo?.ram_gb
+                  const effectiveRam = sysinfo?.available_gb  // use free RAM, not total
                   const fits = effectiveRam ? effectiveRam >= ramRequired : true
                   const isRec = sysinfo?.recommended === m.id
                   return (
