@@ -847,9 +847,12 @@ def _is_tool_intent(text: str) -> bool:
         and any(k in t for k in ["left", "remain", "before summer", "until summer", "how many"])
     )
     next_holiday_query = any(k in t for k in ["next holiday", "upcoming holiday", "how many weeks until", "when is the next holiday"])
+    _event_nouns = ["break", "vacation", "trip", "event", "holiday", "day off", "activity", "field trip", "recess", "party", "schedule"]
     add_event_query = t.startswith("add ") or (
-        "add" in t and any(k in t for k in ["break", "vacation", "trip", "event", "holiday", "day off", "activity"])
+        "add" in t and any(k in t for k in _event_nouns)
     )
+    delete_event_query = "delete" in t or "remove" in t or "cancel" in t
+    update_event_query = any(k in t for k in ["change", "update", "set", "edit", "modify", "move", "reschedule"])
     return (
         ("load" in t and holiday_query)
         or holiday_query
@@ -857,9 +860,9 @@ def _is_tool_intent(text: str) -> bool:
         or school_days_query
         or next_holiday_query
         or add_event_query
+        or delete_event_query
+        or update_event_query
         or ("list" in t and "event" in t)
-        or ("delete" in t and "event" in t)
-        or ("update" in t and "event" in t)
     )
 
 
@@ -920,7 +923,17 @@ def _fallback(messages: list[dict], is_parent: bool, student_id: str | None) -> 
         ):
             return _create_event_nl(deps, _latest_user_message(messages))
 
-        if any(k in text for k in ["change", "update", "set", "edit", "modify"]):
+        if any(k in text for k in ["delete", "remove", "cancel"]):
+            target = _resolve_event_reference(messages, deps)
+            if target:
+                title = target.get("title", "Event")
+                deleted = delete_event(deps=deps, event_id=str(target["id"]))
+                if deleted:
+                    return {"reply": f"Deleted **{title}** from the calendar.", "actions": ["delete_event"]}
+                return {"reply": f"Could not delete {title} — you may not have permission.", "actions": ["delete_denied"]}
+            return {"reply": "I couldn't find that event on your calendar.", "actions": ["event_not_found"]}
+
+        if any(k in text for k in ["change", "update", "set", "edit", "modify", "move", "reschedule"]):
             new_dates = _parse_all_natural_dates(_latest_user_message(messages))
             if not new_dates:
                 new_dates = _extract_iso_dates(text)
