@@ -695,6 +695,26 @@ def _llama_messages_for_chronos(messages: list[dict]) -> list[dict]:
     return [{"role": "system", "content": _system_prompt()}] + messages[-14:]
 
 
+async def _build_context_messages(messages: list[dict], student_id: str | None) -> list[dict]:
+    """System prompt + pre-loaded calendar state + conversation history.
+
+    Fetches events and holidays in parallel so the model has authoritative
+    data in context before it starts reasoning — it never needs to ask the
+    user for their calendar.
+    """
+    ctx = await _parallel_read_context(student_id)
+    today = date.today().isoformat()
+    event_summary = json.dumps(ctx["events"][:20], default=str) if ctx["events"] else "None"
+    holiday_summary = json.dumps(ctx["holidays"][:15], default=str) if ctx["holidays"] else "None"
+    context_block = (
+        f"\n\n## Live Calendar State (authoritative — do not ask the user for this)\n"
+        f"Today: {today}\n"
+        f"Current events ({len(ctx['events'])} total): {event_summary}\n"
+        f"School-year holidays ({len(ctx['holidays'])} total): {holiday_summary}"
+    )
+    return [{"role": "system", "content": _system_prompt() + context_block}] + messages[-14:]
+
+
 def _fallback(messages: list[dict], is_parent: bool, student_id: str | None) -> dict:
     text = _latest_user_message(messages).lower()
     deps = ChronosDeps(is_parent=is_parent, student_id=student_id)
@@ -1003,7 +1023,7 @@ async def stream_chronos(messages: list[dict], *, is_parent: bool, student_id: s
         model_name = _llama_model_name()
         payload = {
             "model": model_name,
-            "messages": _llama_messages_for_chronos(messages),
+            "messages": await _build_context_messages(messages, student_id),
             "temperature": 0.25,
             "max_tokens": 512,
             "stream": True,
