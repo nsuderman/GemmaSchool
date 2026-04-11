@@ -351,9 +351,29 @@ def _resolve_event_reference(messages: list[dict], deps: ChronosDeps) -> dict | 
         if overlap:
             scored.append((overlap, e))
 
-    if scored:
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return scored[0][1]
+    if not scored:
+        return None
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    best = scored[0][1]
+
+    # Bidirectional check: significant words the user said should also appear in
+    # the matched title. If more than half don't, it's a false match (e.g. user
+    # said "Christmas party" but best match is "Christmas Day").
+    _stopwords = {
+        "delete", "remove", "cancel", "change", "update", "move", "reschedule",
+        "add", "create", "show", "list", "what", "when", "from", "with", "your",
+        "their", "about", "into", "over", "after", "before", "that", "this",
+        "have", "does", "event", "calendar", "schedule", "the", "my",
+    }
+    user_content = set(t for t in re.split(r"[^a-z0-9]+", latest) if len(t) >= 4) - _stopwords
+    if user_content:
+        title_text = str(best.get("title", "")).lower()
+        unmatched = [t for t in user_content if t not in title_text]
+        if len(unmatched) > len(user_content) / 2:
+            return None  # User's words don't align well enough — likely a non-existent event
+
+    return best
 
     return None
 
