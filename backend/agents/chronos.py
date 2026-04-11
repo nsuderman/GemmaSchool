@@ -1025,7 +1025,7 @@ async def stream_chronos(messages: list[dict], *, is_parent: bool, student_id: s
             "model": model_name,
             "messages": await _build_context_messages(messages, student_id),
             "temperature": 0.25,
-            "max_tokens": 512,
+            "max_tokens": 2048,
             "stream": True,
         }
 
