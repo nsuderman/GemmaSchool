@@ -39,6 +39,17 @@ logger = logging.getLogger(__name__)
 inference_lock = asyncio.Semaphore(1)
 STABLE_TOOLING = os.getenv("CHRONOS_STABLE_TOOLING", "0").strip().lower() in {"1", "true", "yes", "on"}
 
+# Persistent HTTP client — reuses the TCP connection to llama-server across
+# requests instead of opening a new connection on every Chronos message.
+_http_client: httpx.AsyncClient | None = None
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=httpx.Timeout(5.0, read=90.0))
+    return _http_client
+
 
 async def _parallel_read_context(student_id: str | None) -> dict:
     """Fetch calendar events and school-year holidays concurrently.
@@ -980,8 +991,8 @@ async def stream_chronos(messages: list[dict], *, is_parent: bool, student_id: s
             full_content = ""
             full_thinking = ""
             try:
-                async with httpx.AsyncClient(timeout=45.0) as client:
-                    async with client.stream("POST", f"{llama_url}/v1/chat/completions", json=payload) as resp:
+                client = _get_http_client()
+                async with client.stream("POST", f"{llama_url}/v1/chat/completions", json=payload) as resp:
                         if resp.status_code >= 400:
                             raise RuntimeError(f"stream status {resp.status_code}")
                         async for line in resp.aiter_lines():
@@ -1038,8 +1049,8 @@ async def stream_chronos(messages: list[dict], *, is_parent: bool, student_id: s
         full_thinking = ""
 
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                async with client.stream("POST", f"{llama_url}/v1/chat/completions", json=payload) as resp:
+            client = _get_http_client()
+            async with client.stream("POST", f"{llama_url}/v1/chat/completions", json=payload) as resp:
                     if resp.status_code >= 400:
                         fallback = _chat_with_llama(messages)
                         if fallback:
