@@ -703,12 +703,15 @@ async def _build_context_messages(messages: list[dict], student_id: str | None) 
     user for their calendar.
     """
     ctx = await _parallel_read_context(student_id)
+    school_cal = _system_calendar()
     today = date.today().isoformat()
     event_summary = json.dumps(ctx["events"][:20], default=str) if ctx["events"] else "None"
     holiday_summary = json.dumps(ctx["holidays"][:15], default=str) if ctx["holidays"] else "None"
     context_block = (
         f"\n\n## Live Calendar State (authoritative — do not ask the user for this)\n"
         f"Today: {today}\n"
+        f"School year start: {school_cal.get('school_year_start', 'unknown')}\n"
+        f"School year end: {school_cal.get('school_year_end', 'unknown')}\n"
         f"Current events ({len(ctx['events'])} total): {event_summary}\n"
         f"School-year holidays ({len(ctx['holidays'])} total): {holiday_summary}"
     )
