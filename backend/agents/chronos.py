@@ -90,7 +90,9 @@ def _save_events(events: list[dict]):
 
 def _system_calendar() -> dict:
     if not SYSTEM_SETTINGS_FILE.exists():
-        y = date.today().year
+        today = date.today()
+        # If today is before August, we're in the school year that started last year.
+        y = today.year if today.month >= 8 else today.year - 1
         return {"school_year_start": f"{y}-08-15", "school_year_end": f"{y + 1}-05-31", "holidays": []}
     try:
         return json.loads(SYSTEM_SETTINGS_FILE.read_text()).get("calendar", {})
