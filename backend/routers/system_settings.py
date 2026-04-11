@@ -32,7 +32,9 @@ class CalendarSettings(BaseModel):
 
 
 def _default_calendar() -> dict:
-    year = date.today().year
+    today = date.today()
+    # If today is before August, the current academic year started last year.
+    year = today.year if today.month >= 8 else today.year - 1
     return {
         "school_year_start": f"{year}-08-15",
         "school_year_end": f"{year + 1}-05-31",
