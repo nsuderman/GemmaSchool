@@ -14,7 +14,7 @@ from agents.chronos import run_chronos, stream_chronos
 router = APIRouter()
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "/vault"))
-CALENDAR_FILE = VAULT_PATH / "calendar_events.json"
+CALENDAR_FILE = VAULT_PATH / "chronos" / "calendar_events.json"
 SYSTEM_SETTINGS_FILE = VAULT_PATH / "system_settings.json"
 
 
@@ -88,7 +88,7 @@ def _load_events() -> list[dict]:
 
 
 def _save_events(events: list[dict]):
-    VAULT_PATH.mkdir(parents=True, exist_ok=True)
+    CALENDAR_FILE.parent.mkdir(parents=True, exist_ok=True)
     CALENDAR_FILE.write_text(json.dumps({"events": events}, indent=2))
 
 

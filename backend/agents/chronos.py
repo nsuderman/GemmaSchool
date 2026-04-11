@@ -28,11 +28,35 @@ except Exception:  # pragma: no cover
 
 
 VAULT_PATH = Path(os.getenv("VAULT_PATH", "/vault"))
-CALENDAR_FILE = VAULT_PATH / "calendar_events.json"
+CHRONOS_PATH = VAULT_PATH / "chronos"
+CALENDAR_FILE = CHRONOS_PATH / "calendar_events.json"
+_LEGACY_CALENDAR_FILE = VAULT_PATH / "calendar_events.json"
 SYSTEM_SETTINGS_FILE = VAULT_PATH / "system_settings.json"
+
+# Tools that only read vault state — safe to execute concurrently.
+_READ_ONLY_TOOLS = frozenset({"list_events_tool", "list_us_holidays_tool"})
 logger = logging.getLogger(__name__)
 inference_lock = asyncio.Semaphore(1)
 STABLE_TOOLING = os.getenv("CHRONOS_STABLE_TOOLING", "0").strip().lower() in {"1", "true", "yes", "on"}
+
+
+async def _parallel_read_context(student_id: str | None) -> dict:
+    """Fetch calendar events and school-year holidays concurrently.
+
+    Read-only tools (_READ_ONLY_TOOLS) carry no vault side-effects, so they
+    are safe to run with asyncio.gather().  Write tools (create/update/delete)
+    are always executed serially through the deterministic fallback path.
+    """
+    loop = asyncio.get_event_loop()
+    events, hol_tuple = await asyncio.gather(
+        loop.run_in_executor(None, visible_events, student_id),
+        loop.run_in_executor(None, holidays_in_school_year),
+    )
+    _, _, holidays = hol_tuple
+    return {
+        "events": events,
+        "holidays": [{"date": d, "name": n} for d, n in holidays],
+    }
 
 
 class ChronosResult(BaseModel):
@@ -47,6 +71,10 @@ class ChronosDeps:
 
 
 def _load_events() -> list[dict]:
+    # One-time migration: move legacy root-level file into agent-scoped path.
+    if not CALENDAR_FILE.exists() and _LEGACY_CALENDAR_FILE.exists():
+        CHRONOS_PATH.mkdir(parents=True, exist_ok=True)
+        _LEGACY_CALENDAR_FILE.rename(CALENDAR_FILE)
     if not CALENDAR_FILE.exists():
         return []
     try:
@@ -56,7 +84,7 @@ def _load_events() -> list[dict]:
 
 
 def _save_events(events: list[dict]):
-    VAULT_PATH.mkdir(parents=True, exist_ok=True)
+    CHRONOS_PATH.mkdir(parents=True, exist_ok=True)
     CALENDAR_FILE.write_text(json.dumps({"events": events}, indent=2))
 
 
@@ -870,10 +898,21 @@ async def run_chronos(messages: list[dict], *, is_parent: bool, student_id: str 
 
         try:
             deps = ChronosDeps(is_parent=is_parent, student_id=student_id)
+            # Pre-load read-only context in parallel before the model starts reasoning.
+            ctx = await _parallel_read_context(student_id)
+            context_block = (
+                f"Pre-loaded calendar state ({len(ctx['events'])} events): "
+                + json.dumps(ctx["events"][:20], default=str)
+                + f"\nUpcoming school-year holidays ({len(ctx['holidays'])}): "
+                + json.dumps(ctx["holidays"][:15], default=str)
+            )
             transcript = "\n".join([
                 f"{m.get('role', 'user')}: {str(m.get('content', '')).strip()}" for m in messages[-14:]
             ])
-            prompt = f"Conversation so far:\n{transcript}\n\nRespond as Chronos and use tools when needed."
+            prompt = (
+                f"Context (fetched in parallel, authoritative):\n{context_block}\n\n"
+                f"Conversation so far:\n{transcript}\n\nRespond as Chronos and use tools when needed."
+            )
             result = await asyncio.wait_for(_agent.run(prompt, deps=deps), timeout=35)
             data = result.output
             return {"reply": data.reply, "actions": data.actions}
