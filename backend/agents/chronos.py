@@ -714,6 +714,101 @@ def _school_days_until_summer() -> dict:
     }
 
 
+_MONTH_MAP = {
+    'january': 1, 'february': 2, 'march': 3, 'april': 4,
+    'may': 5, 'june': 6, 'july': 7, 'august': 8,
+    'september': 9, 'october': 10, 'november': 11, 'december': 12,
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4,
+    'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+}
+
+
+def _parse_natural_date(text: str, ref_year: int | None = None) -> str | None:
+    """Parse 'April 20', 'April 20th', 'Apr 20', etc. → YYYY-MM-DD."""
+    year = ref_year or date.today().year
+    m = re.search(
+        r'\b(january|february|march|april|may|june|july|august|september|october|november|december'
+        r'|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b',
+        text.lower(),
+    )
+    if not m:
+        return None
+    month = _MONTH_MAP.get(m.group(1))
+    day = int(m.group(2))
+    if not month or not (1 <= day <= 31):
+        return None
+    try:
+        return date(year, month, day).isoformat()
+    except ValueError:
+        return None
+
+
+def _parse_all_natural_dates(text: str, ref_year: int | None = None) -> list[str]:
+    """Return all natural-language dates found in text, in order."""
+    year = ref_year or date.today().year
+    results = []
+    for m in re.finditer(
+        r'\b(january|february|march|april|may|june|july|august|september|october|november|december'
+        r'|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b',
+        text.lower(),
+    ):
+        month = _MONTH_MAP.get(m.group(1))
+        day = int(m.group(2))
+        if month and 1 <= day <= 31:
+            try:
+                results.append(date(year, month, day).isoformat())
+            except ValueError:
+                pass
+    return results
+
+
+def _detect_event_kind(text: str) -> str:
+    t = text.lower()
+    if any(k in t for k in ['trip', 'museum', 'visit', 'excursion', 'field']):
+        return 'field_trip'
+    if any(k in t for k in ['break', 'vacation', 'off', 'recess']):
+        return 'vacation'
+    if 'holiday' in t:
+        return 'holiday'
+    return 'personal'
+
+
+def _create_event_nl(deps: ChronosDeps, text: str) -> dict:
+    """Create an event from natural language like 'add spring break from April 20 to April 24'."""
+    dates = _parse_all_natural_dates(text)
+    if not dates:
+        # Try ISO dates as fallback
+        dates = _extract_iso_dates(text)
+    if not dates:
+        return {"reply": "I couldn't find a date in your message. Try: 'add spring break from April 20 to April 24'.", "actions": []}
+
+    start_date = dates[0]
+    end_date = dates[1] if len(dates) > 1 else None
+
+    # Extract title: text between "add [a/an]" and "from/on"
+    title_match = re.search(r'\badd\s+(?:a\s+|an\s+)?(.+?)(?:\s+from\s+|\s+on\s+|\s+\d)', text.lower())
+    title = title_match.group(1).strip().title() if title_match else "Event"
+    kind = _detect_event_kind(text)
+    scope = "global" if deps.is_parent else "student"
+
+    try:
+        event = create_event(
+            deps=deps,
+            title=title,
+            date_value=start_date,
+            end_date=end_date,
+            kind=kind,
+            scope=scope,
+        )
+        reply = f"Added **{event['title']}** ({kind}) on {start_date}"
+        if end_date and end_date != start_date:
+            reply += f" through {end_date}"
+        reply += "."
+        return {"reply": reply, "actions": ["create_event"]}
+    except ValueError as exc:
+        return {"reply": str(exc), "actions": []}
+
+
 def _next_holiday() -> dict:
     """Return the next upcoming US federal holiday and how many weeks away it is."""
     today = date.today()
@@ -752,16 +847,19 @@ def _is_tool_intent(text: str) -> bool:
         and any(k in t for k in ["left", "remain", "before summer", "until summer", "how many"])
     )
     next_holiday_query = any(k in t for k in ["next holiday", "upcoming holiday", "how many weeks until", "when is the next holiday"])
+    add_event_query = t.startswith("add ") or (
+        "add" in t and any(k in t for k in ["break", "vacation", "trip", "event", "holiday", "day off", "activity"])
+    )
     return (
         ("load" in t and holiday_query)
         or holiday_query
         or today_query
         or school_days_query
         or next_holiday_query
+        or add_event_query
         or ("list" in t and "event" in t)
         or ("delete" in t and "event" in t)
         or ("update" in t and "event" in t)
-        or ("add" in t and "event" in t)
     )
 
 
@@ -816,6 +914,11 @@ def _fallback(messages: list[dict], is_parent: bool, student_id: str | None) -> 
 
         if any(k in text for k in ["next holiday", "upcoming holiday", "how many weeks until", "when is the next holiday"]):
             return _next_holiday()
+
+        if text.startswith("add ") or (
+            "add" in text and any(k in text for k in ["break", "vacation", "trip", "event", "holiday", "day off", "activity"])
+        ):
+            return _create_event_nl(deps, _latest_user_message(messages))
 
         if ("start and end" in text or "start/end" in text) and ("holiday" in text or "event" in text):
             target = _resolve_event_reference(messages, deps)
