@@ -2,9 +2,12 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import asyncio
+import logging
 import os
 import json
 from pathlib import Path
+
+import httpx
 
 from routers import quests, agents, setup, vault, profiles, curriculum, system_settings, curriculum_planner, calendar
 
@@ -59,10 +62,57 @@ manager = ConnectionManager()
 app.state.ws_manager = manager
 
 
+log = logging.getLogger(__name__)
+
+
 @app.on_event("startup")
 async def _capture_loop():
     """Store the running event loop so background threads can broadcast via WS."""
     app.state.loop = asyncio.get_running_loop()
+
+
+async def _run_warmup():
+    """Poll until llama-server is up, then send a 1-token request to pre-load the model."""
+    llama_url = os.getenv("LLAMA_BASE_URL", "http://llama-server:8080")
+    model_file = os.getenv("LLAMA_MODEL_FILE", "")
+    model_name = model_file[:-5] if model_file.endswith(".gguf") else (model_file or "current-model")
+
+    # Wait for llama-server to become healthy (up to 90s).
+    async with httpx.AsyncClient(timeout=5.0) as probe:
+        for attempt in range(30):
+            try:
+                r = await probe.get(f"{llama_url}/health")
+                if r.status_code == 200:
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(3)
+        else:
+            log.warning("warmup: llama-server did not become healthy in time")
+            return
+
+    # One minimal completion to pull the model weights into memory.
+    log.info("warmup: sending 1-token prompt to pre-load model '%s'", model_name)
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            await client.post(
+                f"{llama_url}/v1/chat/completions",
+                json={
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                    "temperature": 0,
+                },
+            )
+        log.info("warmup: complete — model is loaded and ready")
+    except Exception as exc:
+        log.warning("warmup: failed (%s) — first request will still be slow", exc)
+
+
+@app.on_event("startup")
+async def _schedule_warmup():
+    """Fire-and-forget warmup so it doesn't block the startup sequence."""
+    asyncio.create_task(_run_warmup())
 
 MODEL_FILE_TO_ID = {
     "gemma-4-E2B-it-Q4_K_M.gguf": "gemma4:e2b",
