@@ -920,6 +920,28 @@ def _fallback(messages: list[dict], is_parent: bool, student_id: str | None) -> 
         ):
             return _create_event_nl(deps, _latest_user_message(messages))
 
+        if any(k in text for k in ["change", "update", "set", "edit", "modify"]):
+            new_dates = _parse_all_natural_dates(_latest_user_message(messages))
+            if not new_dates:
+                new_dates = _extract_iso_dates(text)
+            if new_dates:
+                target = _resolve_event_reference(messages, deps)
+                if target:
+                    updating_end = "end" in text
+                    updating_start = "start" in text and "end" not in text
+                    if updating_end:
+                        updated = update_event(deps=deps, event_id=str(target["id"]), end_date=new_dates[0])
+                    elif updating_start:
+                        updated = update_event(deps=deps, event_id=str(target["id"]), date_value=new_dates[0])
+                    else:
+                        start = new_dates[0]
+                        end = new_dates[1] if len(new_dates) > 1 else None
+                        updated = update_event(deps=deps, event_id=str(target["id"]), date_value=start, end_date=end)
+                    reply = f"Updated **{updated['title']}**: {updated['date']}"
+                    if updated.get("end_date") and updated["end_date"] != updated["date"]:
+                        reply += f" → {updated['end_date']}"
+                    return {"reply": reply, "actions": ["update_event"]}
+
         if ("start and end" in text or "start/end" in text) and ("holiday" in text or "event" in text):
             target = _resolve_event_reference(messages, deps)
             if target:
