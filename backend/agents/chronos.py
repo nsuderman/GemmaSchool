@@ -671,6 +671,49 @@ def _sanitize_llm_text(text: str | None) -> str | None:
     return cleaned
 
 
+def count_school_days(start: date, end: date, holiday_dates: set[str]) -> int:
+    """Count weekdays between start (exclusive) and end (inclusive), minus holidays."""
+    count = 0
+    current = start + timedelta(days=1)
+    while current <= end:
+        if current.weekday() < 5 and current.isoformat() not in holiday_dates:
+            count += 1
+        current += timedelta(days=1)
+    return count
+
+
+def _school_days_until_summer() -> dict:
+    """Deterministically count remaining school days using Python — never trust the LLM for this."""
+    cal = _system_calendar()
+    today = date.today()
+    end_str = cal.get("school_year_end", "")
+    if not end_str:
+        return {"reply": "No school year end date is configured. Set it in Calendar Settings.", "actions": ["school_days_error"]}
+    try:
+        end = date.fromisoformat(end_str)
+    except ValueError:
+        return {"reply": f"School year end date '{end_str}' is not valid.", "actions": ["school_days_error"]}
+
+    if today > end:
+        return {"reply": "The school year has already ended — enjoy summer!", "actions": ["school_days_done"]}
+
+    _, _, holiday_rows = holidays_in_school_year()
+    holiday_dates = {d for d, _ in holiday_rows}
+    remaining = count_school_days(today, end, holiday_dates)
+
+    # Find the next holiday in the window for context.
+    upcoming = next(
+        ((d, n) for d, n in sorted(holiday_rows) if date.fromisoformat(d) > today and date.fromisoformat(d) <= end),
+        None,
+    )
+    note = f" The only holiday in this window is {upcoming[1]} on {upcoming[0]}." if upcoming else " No holidays remain in the school year."
+
+    return {
+        "reply": f"You have {remaining} school days left before summer (through {end_str}).{note}",
+        "actions": ["count_school_days"],
+    }
+
+
 def _is_tool_intent(text: str) -> bool:
     t = text.lower()
     holiday_query = "holiday" in t
@@ -681,10 +724,15 @@ def _is_tool_intent(text: str) -> bool:
         or ("day is it" in t)
         or t.strip() in {"today", "today?", "date", "date?", "what is today", "what's today"}
     )
+    school_days_query = (
+        ("school day" in t or "school days" in t)
+        and any(k in t for k in ["left", "remain", "before summer", "until summer", "how many"])
+    )
     return (
         ("load" in t and holiday_query)
         or holiday_query
         or today_query
+        or school_days_query
         or ("list" in t and "event" in t)
         or ("delete" in t and "event" in t)
         or ("update" in t and "event" in t)
@@ -736,6 +784,11 @@ def _fallback(messages: list[dict], is_parent: bool, student_id: str | None) -> 
     deps = ChronosDeps(is_parent=is_parent, student_id=student_id)
 
     try:
+        if ("school day" in text or "school days" in text) and any(
+            k in text for k in ["left", "remain", "before summer", "until summer", "how many"]
+        ):
+            return _school_days_until_summer()
+
         if ("start and end" in text or "start/end" in text) and ("holiday" in text or "event" in text):
             target = _resolve_event_reference(messages, deps)
             if target:
