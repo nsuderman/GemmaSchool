@@ -714,6 +714,29 @@ def _school_days_until_summer() -> dict:
     }
 
 
+def _next_holiday() -> dict:
+    """Return the next upcoming US federal holiday and how many weeks away it is."""
+    today = date.today()
+    _, _, rows = holidays_in_school_year()
+    upcoming = [(d, n) for d, n in rows if date.fromisoformat(d) > today]
+    if not upcoming:
+        return {"reply": "There are no more holidays in the school year.", "actions": ["next_holiday"]}
+    next_date_str, next_name = min(upcoming, key=lambda x: x[0])
+    next_date = date.fromisoformat(next_date_str)
+    days_away = (next_date - today).days
+    weeks, extra_days = divmod(days_away, 7)
+    if weeks == 0:
+        timing = f"{days_away} day{'s' if days_away != 1 else ''}"
+    elif extra_days == 0:
+        timing = f"{weeks} week{'s' if weeks != 1 else ''} exactly"
+    else:
+        timing = f"{weeks} week{'s' if weeks != 1 else ''} and {extra_days} day{'s' if extra_days != 1 else ''}"
+    return {
+        "reply": f"Your next holiday is **{next_name}** on {next_date_str} — {timing} away.",
+        "actions": ["next_holiday"],
+    }
+
+
 def _is_tool_intent(text: str) -> bool:
     t = text.lower()
     holiday_query = "holiday" in t
@@ -728,11 +751,13 @@ def _is_tool_intent(text: str) -> bool:
         ("school day" in t or "school days" in t)
         and any(k in t for k in ["left", "remain", "before summer", "until summer", "how many"])
     )
+    next_holiday_query = any(k in t for k in ["next holiday", "upcoming holiday", "how many weeks until", "when is the next holiday"])
     return (
         ("load" in t and holiday_query)
         or holiday_query
         or today_query
         or school_days_query
+        or next_holiday_query
         or ("list" in t and "event" in t)
         or ("delete" in t and "event" in t)
         or ("update" in t and "event" in t)
@@ -788,6 +813,9 @@ def _fallback(messages: list[dict], is_parent: bool, student_id: str | None) -> 
             k in text for k in ["left", "remain", "before summer", "until summer", "how many"]
         ):
             return _school_days_until_summer()
+
+        if any(k in text for k in ["next holiday", "upcoming holiday", "how many weeks until", "when is the next holiday"]):
+            return _next_holiday()
 
         if ("start and end" in text or "start/end" in text) and ("holiday" in text or "event" in text):
             target = _resolve_event_reference(messages, deps)
